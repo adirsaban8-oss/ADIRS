@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LISHAI SIMAN - מניקוריסטית מקצועית בקרני שומרון. טיפולי ציפורניים יוקרתיים, בנייה, ג'ל, גבות ועוד. הזמיני תור עכשיו!">
+    <meta name="keywords" content="מניקור, פדיקור, ציפורניים, בנייה, ג'ל, גבות, קרני שומרון, לישי סימני">
+    <title>LISHAI SIMAN | מניקוריסטית מקצועית</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Heebo:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- בס"ד -->
+    <div class="bsd-header" style="text-align: left; padding: 5px 15px; font-size: 14px; font-weight: bold;">בס"ד</div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#home" class="nav-logo">
+                <span class="logo-text">LISHAI SIMAN</span>
+            </a>
+
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span class="hamburger"></span>
+            </button>
+
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#home" class="nav-link">בית</a></li>
+                <li><a href="#services" class="nav-link">שירותים</a></li>
+                <li><a href="#policies" class="nav-link">מדיניות</a></li>
+                <li><a href="#booking" class="nav-link">הזמנת תור</a></li>
+                <li><a href="#gallery" class="nav-link">גלריה</a></li>
+                <li><a href="#contact" class="nav-link">צור קשר</a></li>
+                <li><a href="#about" class="nav-link">אודות</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- 1. Hero Section (בית) -->
+    <section id="home" class="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="hero-badge">
+                <span>✦ LUXURY NAIL ART ✦</span>
+            </div>
+            <h1 class="hero-title">
+                <span class="title-line">LISHAI</span>
+                <span class="title-line gold">SIMANI</span>
+            </h1>
+            <p class="hero-subtitle">מניקוריסטית מקצועית</p>
+            <p class="hero-tagline">יוקרה, מקצועיות ודיוק בכל ציפורן</p>
+            <div class="hero-buttons">
+                <a href="#booking" class="btn btn-primary">הזמיני תור</a>
+                <a href="#services" class="btn btn-secondary">השירותים שלנו</a>
+            </div>
+        </div>
+        <div class="hero-decoration">
+            <div class="deco-line line-1"></div>
+            <div class="deco-line line-2"></div>
+        </div>
+    </section>
+
+    <!-- 2. Services Section (שירותים) -->
+    <section id="services" class="services section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">שירותים</span>
+                <h2 class="section-title">השירותים שלנו</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+                <p class="section-subtitle">טיפולים יוקרתיים במחירים הוגנים</p>
+            </div>
+
+            <div class="services-grid">
+                {% for service in services %}
+                <div class="service-card" data-aos="fade-up">
+                    <div class="service-icon">
+                        {% if 'Gel' in service.name or 'ג\'ל' in service.name_he %}
+                        <i class="fas fa-paint-brush"></i>
+                        {% elif 'Build' in service.name or 'בנייה' in service.name_he %}
+                        <i class="fas fa-magic"></i>
+                        {% elif 'Eyebrow' in service.name or 'גבות' in service.name_he %}
+                        <i class="fas fa-eye"></i>
+                        {% elif 'Mustache' in service.name or 'שפם' in service.name_he %}
+                        <i class="fas fa-feather"></i>
+                        {% elif 'Extension' in service.name or 'הארכה' in service.name_he %}
+                        <i class="fas fa-plus-circle"></i>
+                        {% elif 'Fill' in service.name or 'מילוי' in service.name_he %}
+                        <i class="fas fa-sync-alt"></i>
+                        {% elif 'Tinting' in service.name or 'צביעה' in service.name_he %}
+                        <i class="fas fa-palette"></i>
+                        {% else %}
+                        <i class="fas fa-spa"></i>
+                        {% endif %}
+                    </div>
+                    <h3 class="service-name">{{ service.name_he }}</h3>
+                    <p class="service-name-en">{{ service.name }}</p>
+                    <div class="service-price">
+                        <span class="price-amount">{{ service.price }}</span>
+                        <span class="price-currency">₪</span>
+                        {% if service.get('note') %}
+                        <span class="price-note">(לציפורן)</span>
+                        {% endif %}
+                    </div>
+                    <a href="#booking" class="service-book-btn">הזמיני עכשיו</a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Policies Section (מדיניות) -->
+    <section id="policies" class="policies section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">מדיניות</span>
+                <h2 class="section-title">מדיניות ביטולים</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+                <p class="section-subtitle">לשמירה על כבוד הדדי וזמן של כולנו</p>
+            </div>
+
+            <div class="policies-content">
+                <div class="policy-card">
+                    <div class="policy-icon warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <h4>ביטול באותו היום</h4>
+                    <p>חיוב של 50% מעלות הטיפול</p>
+                </div>
+
+                <div class="policy-card">
+                    <div class="policy-icon danger">
+                        <i class="fas fa-times-circle"></i>
+                    </div>
+                    <h4>אי הגעה ללא הודעה</h4>
+                    <p>חיוב מלא של עלות הטיפול</p>
+                </div>
+
+                <div class="policy-card">
+                    <div class="policy-icon warning">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <h4>איחור של מעל 15 דקות</h4>
+                    <p>ללא הודעה מראש - ייחשב כביטול עם חיוב של 50%</p>
+                </div>
+            </div>
+
+            <div class="policies-note">
+                <p>תודה על ההבנה 🤍</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Booking Section (הזמנת תור) -->
+    <section id="booking" class="booking section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">הזמנת תור</span>
+                <h2 class="section-title">קבעי תור עכשיו</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+                <p class="section-subtitle">בחרי תאריך ושעה שנוחים לך</p>
+            </div>
+
+            <div class="booking-container">
+                <div class="booking-info">
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>שעות פעילות</h4>
+                            <p>ראשון - חמישי: 09:00 - 20:00</p>
+                            <p>שישי - שבת: סגור</p>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>מיקום</h4>
+                            <p>משעול הרקפת 3</p>
+                            <p>קרני שומרון</p>
+                        </div>
+                    </div>
+                    <div class="info-card">
+                        <div class="info-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="info-content">
+                            <h4>טלפון</h4>
+                            <p><a href="tel:051-5656295">051-5656295</a></p>
+                        </div>
+                    </div>
+                </div>
+
+                <form class="booking-form" id="bookingForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bookingName">
+                                <i class="fas fa-user"></i>
+                                שם מלא
+                            </label>
+                            <input type="text" id="bookingName" name="name" required placeholder="הכניסי את שמך">
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingPhone">
+                                <i class="fas fa-phone"></i>
+                                טלפון
+                            </label>
+                            <input type="tel" id="bookingPhone" name="phone" required placeholder="050-0000000">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bookingEmail">
+                            <i class="fas fa-envelope"></i>
+                            אימייל (לקבלת תזכורות)
+                        </label>
+                        <input type="email" id="bookingEmail" name="email" required placeholder="your@email.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bookingService">
+                            <i class="fas fa-spa"></i>
+                            בחרי שירות
+                        </label>
+                        <select id="bookingService" name="service" required>
+                            <option value="">בחרי טיפול...</option>
+                            {% for service in services %}
+                            <option value="{{ service.name }}">{{ service.name_he }} - {{ service.price }}₪</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="bookingDate">
+                                <i class="fas fa-calendar"></i>
+                                תאריך
+                            </label>
+                            <input type="date" id="bookingDate" name="date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="bookingTime">
+                                <i class="fas fa-clock"></i>
+                                שעה
+                            </label>
+                            <select id="bookingTime" name="time" required disabled>
+                                <option value="">בחרי תאריך קודם</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bookingNotes">
+                            <i class="fas fa-comment"></i>
+                            הערות (אופציונלי)
+                        </label>
+                        <textarea id="bookingNotes" name="notes" rows="3" placeholder="הערות נוספות..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-calendar-check"></i>
+                        אשרי הזמנה
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Gallery Section (גלריה) -->
+    <section id="gallery" class="gallery section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">גלריה</span>
+                <h2 class="section-title">העבודות שלי</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+                <p class="section-subtitle">כל עבודה היא יצירת אמנות</p>
+            </div>
+
+            <div class="gallery-grid">
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery1.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">עיצוב מושלם</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery2.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">דיוק מושלם</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery3.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">עיצוב ייחודי</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery4.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">מראה מרהיב</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery5.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">פינוק מלכותי</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery6.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">יוקרה ואלגנטיות</span>
+                    </div>
+                </div>
+                <div class="gallery-item" data-category="nails">
+                    <img src="{{ url_for('static', filename='images/gallery7.jpeg') }}" alt="עבודת ציפורניים מאת לישי סימני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span class="gallery-caption">תוצאה מושלמת</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="gallery-note">
+                <i class="fas fa-camera"></i>
+                התמונות מציגות עבודות מקוריות של לישי סימני
+            </p>
+        </div>
+    </section>
+
+    <!-- 6. Contact Section (צור קשר) -->
+    <section id="contact" class="contact section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">צור קשר</span>
+                <h2 class="section-title">בואי נדבר</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+            </div>
+
+            <div class="contact-container">
+                <div class="contact-info">
+                    <h3>פרטי התקשרות</h3>
+
+                    <div class="contact-item">
+                        <div class="contact-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>כתובת</h4>
+                            <p>משעול הרקפת 3, קרני שומרון</p>
+                        </div>
+                    </div>
+
+                    <div class="contact-item">
+                        <div class="contact-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>טלפון</h4>
+                            <p><a href="tel:051-5656295">051-5656295</a></p>
+                        </div>
+                    </div>
+
+                    <div class="contact-item">
+                        <div class="contact-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="contact-details">
+                            <h4>שעות פעילות</h4>
+                            <p>ראשון - חמישי: 09:00 - 20:00</p>
+                            <p>שישי - שבת: סגור</p>
+                        </div>
+                    </div>
+
+                    <div class="social-links">
+                        <a href="https://www.instagram.com/lishai_simani_beauty" target="_blank" class="social-link" aria-label="Instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://wa.me/972515656295?text=Hi%20I%20came%20from%20the%20website" target="_blank" class="social-link" aria-label="WhatsApp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <form class="contact-form" id="contactForm">
+                    <div class="form-group">
+                        <label for="contactName">
+                            <i class="fas fa-user"></i>
+                            שם מלא
+                        </label>
+                        <input type="text" id="contactName" name="name" required placeholder="הכניסי את שמך">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contactPhone">
+                            <i class="fas fa-phone"></i>
+                            טלפון
+                        </label>
+                        <input type="tel" id="contactPhone" name="phone" required placeholder="050-0000000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="contactMessage">
+                            <i class="fas fa-comment"></i>
+                            הודעה
+                        </label>
+                        <textarea id="contactMessage" name="message" rows="4" required placeholder="כתבי את הודעתך..."></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-full">
+                        <i class="fas fa-paper-plane"></i>
+                        שלחי הודעה
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. About Section (אודות) -->
+    <section id="about" class="about section">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-badge">אודות</span>
+                <h2 class="section-title">הכירי את לישי</h2>
+                <div class="title-decoration">
+                    <span class="deco-diamond">◆</span>
+                </div>
+            </div>
+
+            <div class="about-content">
+                <div class="about-image">
+                    <div class="image-frame">
+                        <div class="frame-corner top-right"></div>
+                        <div class="frame-corner bottom-left"></div>
+                        <div class="image-placeholder">
+                            <i class="fas fa-spa"></i>
+                            <span>LISHAI SIMAN</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="about-text">
+                    <h3 class="about-subtitle">מקצועיות, יוקרה ואהבה לכל פרט</h3>
+                    <p>
+                        שלום, אני לישי סימני, מניקוריסטית מקצועית עם תשוקה אמיתית לאמנות הציפורניים.
+                        בסטודיו שלי בקרני שומרון, אני מציעה חוויה יוקרתית ואישית לכל לקוחה.
+                    </p>
+                    <p>
+                        אני מאמינה שכל אישה ראויה להרגיש מפונקת ויפה.
+                        בכל טיפול אני משקיעה תשומת לב מלאה לפרטים הקטנים ביותר,
+                        משתמשת בחומרים איכותיים בלבד ומקפידה על סטריליות מושלמת.
+                    </p>
+                    <div class="about-features">
+                        <div class="feature">
+                            <i class="fas fa-award"></i>
+                            <span>מקצועיות</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-gem"></i>
+                            <span>יוקרה</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-heart"></i>
+                            <span>אכפתיות</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>היגיינה</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3 class="footer-logo">LISHAI SIMAN</h3>
+                    <p>מניקוריסטית מקצועית</p>
+                    <p class="footer-tagline">יוקרה, מקצועיות ודיוק</p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>ניווט מהיר</h4>
+                    <ul>
+                        <li><a href="#home">בית</a></li>
+                        <li><a href="#services">שירותים</a></li>
+                        <li><a href="#policies">מדיניות</a></li>
+                        <li><a href="#booking">הזמנת תור</a></li>
+                        <li><a href="#gallery">גלריה</a></li>
+                        <li><a href="#contact">צור קשר</a></li>
+                        <li><a href="#about">אודות</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-contact">
+                    <h4>יצירת קשר</h4>
+                    <p><i class="fas fa-map-marker-alt"></i> משעול הרקפת 3, קרני שומרון</p>
+                    <p><i class="fas fa-phone-alt"></i> <a href="tel:051-5656295">051-5656295</a></p>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>© 2024 LISHAI SIMAN. כל הזכויות שמורות.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Back to Top Button -->
+    <button class="back-to-top" id="backToTop" aria-label="Back to top">
+        <i class="fas fa-chevron-up"></i>
+    </button>
+
+    <!-- Success Modal -->
+    <div class="modal" id="successModal">
+        <div class="modal-content">
+            <div class="modal-icon success">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="modal-title">התור נקבע בהצלחה!</h3>
+            <p class="modal-message">נשמח לראותך בקרוב</p>
+            <button class="btn btn-primary" onclick="closeModal()">סגור</button>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

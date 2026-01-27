@@ -1,0 +1,249 @@
+"""
+Google Calendar Service Module for LISHAY Booking System
+Handles all interactions with Google Calendar API
+"""
+
+import os
+import json
+from datetime import datetime, timedelta
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Google Calendar API scopes
+SCOPES = ['https://www.googleapis.com/auth/calendar']
+
+# Load configuration from environment variables
+CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
+CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS_JSON', '')  # For Railway/production
+CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
+
+
+def get_calendar_service():
+    """
+    Create and return a Google Calendar service instance.
+    Uses service account credentials for authentication.
+    Supports both file-based and environment variable credentials.
+    """
+    try:
+        # Try to load from environment variable first (for production)
+        if CREDENTIALS_JSON:
+            credentials_info = json.loads(CREDENTIALS_JSON)
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info, scopes=SCOPES
+            )
+        else:
+            # Fall back to file-based credentials (for local development)
+            credentials = service_account.Credentials.from_service_account_file(
+                CREDENTIALS_FILE, scopes=SCOPES
+            )
+        service = build('calendar', 'v3', credentials=credentials)
+        return service
+    except FileNotFoundError:
+        raise Exception(f"Credentials file not found: {CREDENTIALS_FILE}")
+    except Exception as e:
+        raise Exception(f"Failed to create calendar service: {str(e)}")
+
+
+def get_busy_slots(date_str):
+    """
+    Get all busy time slots for a specific date.
+
+    Args:
+        date_str: Date in 'YYYY-MM-DD' format
+
+    Returns:
+        List of tuples with (start_time, end_time) in 'HH:MM' format
+    """
+    try:
+        service = get_calendar_service()
+
+        # Parse date and create time boundaries
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+        time_min = date.replace(hour=0, minute=0, second=0).isoformat() + 'Z'
+        time_max = date.replace(hour=23, minute=59, second=59).isoformat() + 'Z'
+
+        # Query calendar for events
+        events_result = service.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+
+        events = events_result.get('items', [])
+        busy_slots = []
+
+        for event in events:
+            start = event['start'].get('dateTime', event['start'].get('date'))
+            end = event['end'].get('dateTime', event['end'].get('date'))
+
+            # Parse datetime and extract time
+            if 'T' in start:  # DateTime format
+                start_time = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                end_time = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                busy_slots.append((
+                    start_time.strftime('%H:%M'),
+                    end_time.strftime('%H:%M')
+                ))
+
+        return busy_slots
+
+    except HttpError as e:
+        raise Exception(f"Google Calendar API error: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to get busy slots: {str(e)}")
+
+
+def check_availability(date_str, time_str, duration_minutes):
+    """
+    Check if a specific time slot is available.
+
+    Args:
+        date_str: Date in 'YYYY-MM-DD' format
+        time_str: Time in 'HH:MM' format
+        duration_minutes: Duration of the appointment in minutes
+
+    Returns:
+        True if slot is available, False otherwise
+    """
+    try:
+        busy_slots = get_busy_slots(date_str)
+
+        # Parse requested time
+        requested_start = datetime.strptime(time_str, '%H:%M')
+        requested_end = requested_start + timedelta(minutes=duration_minutes)
+
+        # Check for conflicts with existing events
+        for busy_start_str, busy_end_str in busy_slots:
+            busy_start = datetime.strptime(busy_start_str, '%H:%M')
+            busy_end = datetime.strptime(busy_end_str, '%H:%M')
+
+            # Check if there's any overlap
+            if not (requested_end <= busy_start or requested_start >= busy_end):
+                return False
+
+        return True
+
+    except Exception as e:
+        raise Exception(f"Failed to check availability: {str(e)}")
+
+
+def create_event(booking_data):
+    """
+    Create a new calendar event for a booking.
+
+    Args:
+        booking_data: Dictionary containing:
+            - name: Customer name
+            - phone: Customer phone
+            - service: Service name
+            - service_he: Service name in Hebrew
+            - date: Date in 'YYYY-MM-DD' format
+            - time: Time in 'HH:MM' format
+            - duration: Duration in minutes
+            - notes: Optional notes
+
+    Returns:
+        Created event object from Google Calendar API
+    """
+    try:
+        service = get_calendar_service()
+
+        # Parse date and time
+        start_datetime = datetime.strptime(
+            f"{booking_data['date']} {booking_data['time']}",
+            '%Y-%m-%d %H:%M'
+        )
+        end_datetime = start_datetime + timedelta(minutes=booking_data.get('duration', 60))
+
+        # Build event description
+        description = f"""
+{booking_data.get('service_he', booking_data['service'])}
+
+{booking_data['name']}
+{booking_data['phone']}
+{booking_data.get('email', '')}
+""".strip()
+
+        if booking_data.get('notes'):
+            description += f"\n\n{booking_data['notes']}"
+
+        # Create event object
+        event = {
+            'summary': f"{booking_data['name']} - {booking_data.get('service_he', booking_data['service'])}",
+            'description': description,
+            'start': {
+                'dateTime': start_datetime.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+            'end': {
+                'dateTime': end_datetime.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+            'reminders': {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'popup', 'minutes': 60},
+                    {'method': 'popup', 'minutes': 1440},  # 24 hours
+                ],
+            },
+        }
+
+        # Insert event to calendar
+        created_event = service.events().insert(
+            calendarId=CALENDAR_ID,
+            body=event
+        ).execute()
+
+        return created_event
+
+    except HttpError as e:
+        raise Exception(f"Google Calendar API error: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to create event: {str(e)}")
+
+
+def filter_available_slots(date_str, all_slots, slot_duration=30):
+    """
+    Filter out busy slots from a list of available time slots.
+
+    Args:
+        date_str: Date in 'YYYY-MM-DD' format
+        all_slots: List of time slots in 'HH:MM' format
+        slot_duration: Duration of each slot in minutes (default 30)
+
+    Returns:
+        List of available time slots
+    """
+    try:
+        busy_slots = get_busy_slots(date_str)
+        available_slots = []
+
+        for slot in all_slots:
+            slot_start = datetime.strptime(slot, '%H:%M')
+            slot_end = slot_start + timedelta(minutes=slot_duration)
+
+            is_available = True
+            for busy_start_str, busy_end_str in busy_slots:
+                busy_start = datetime.strptime(busy_start_str, '%H:%M')
+                busy_end = datetime.strptime(busy_end_str, '%H:%M')
+
+                # Check if there's any overlap
+                if not (slot_end <= busy_start or slot_start >= busy_end):
+                    is_available = False
+                    break
+
+            if is_available:
+                available_slots.append(slot)
+
+        return available_slots
+
+    except Exception as e:
+        # If calendar service fails, return all slots (graceful degradation)
+        print(f"Warning: Could not filter busy slots: {str(e)}")
+        return all_slots
