@@ -23,23 +23,29 @@ EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Use App Password for Gmail
 
 # Google Calendar configuration
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
-CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS_JSON', '')  # For Railway/production
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
 
 
 def get_calendar_service():
-    """Create and return a Google Calendar service instance."""
-    if CREDENTIALS_JSON:
-        credentials_info = json.loads(CREDENTIALS_JSON)
+    """
+    Create and return a Google Calendar service instance.
+    Uses GOOGLE_CREDENTIALS_JSON environment variable only (no file operations).
+    """
+    credentials_json = os.getenv('GOOGLE_CREDENTIALS_JSON', '')
+
+    if not credentials_json:
+        raise Exception("GOOGLE_CREDENTIALS_JSON environment variable is not set")
+
+    try:
+        credentials_info = json.loads(credentials_json)
         credentials = service_account.Credentials.from_service_account_info(
             credentials_info, scopes=SCOPES
         )
-    else:
-        credentials = service_account.Credentials.from_service_account_file(
-            CREDENTIALS_FILE, scopes=SCOPES
-        )
-    return build('calendar', 'v3', credentials=credentials)
+        return build('calendar', 'v3', credentials=credentials)
+    except json.JSONDecodeError as e:
+        raise Exception(f"Invalid JSON in GOOGLE_CREDENTIALS_JSON: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Failed to create calendar service: {str(e)}")
 
 
 def get_upcoming_appointments(hours_ahead=24):

@@ -17,43 +17,70 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 # Load configuration from environment variables
-CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
-CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS_JSON', '')  # For Railway/production
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
+
+# Cached service instance
+_calendar_service = None
 
 
 def get_calendar_service():
     """
     Create and return a Google Calendar service instance.
-    Uses service account credentials for authentication.
-    Supports both file-based and environment variable credentials.
+    Uses service account credentials from GOOGLE_CREDENTIALS_JSON environment variable.
+    NO FILE OPERATIONS - production safe for Railway.
     """
+    global _calendar_service
+
+    # Return cached service if available
+    if _calendar_service is not None:
+        return _calendar_service
+
+    # Get credentials JSON from environment variable
+    credentials_json = os.getenv('GOOGLE_CREDENTIALS_JSON', '')
+
+    if not credentials_json:
+        raise Exception(
+            "GOOGLE_CREDENTIALS_JSON environment variable is not set. "
+            "In Railway: Go to Variables and add GOOGLE_CREDENTIALS_JSON with "
+            "the FULL content of your service account JSON file."
+        )
+
+    # Log for debugging (first 50 chars only for security)
+    print(f"GOOGLE_CREDENTIALS_JSON found, length: {len(credentials_json)}")
+    print(f"First 50 chars: {credentials_json[:50]}...")
+
     try:
-        # Try to load from environment variable first (for production/Railway)
-        if CREDENTIALS_JSON:
-            print("Using GOOGLE_CREDENTIALS_JSON from environment")
-            credentials_info = json.loads(CREDENTIALS_JSON)
-            credentials = service_account.Credentials.from_service_account_info(
-                credentials_info, scopes=SCOPES
-            )
-        elif os.path.exists(CREDENTIALS_FILE):
-            # Fall back to file-based credentials (for local development)
-            print(f"Using credentials file: {CREDENTIALS_FILE}")
-            credentials = service_account.Credentials.from_service_account_file(
-                CREDENTIALS_FILE, scopes=SCOPES
-            )
-        else:
-            raise Exception(
-                "Google Calendar credentials not configured. "
-                "Set GOOGLE_CREDENTIALS_JSON environment variable in Railway "
-                "with the contents of your service account JSON file."
-            )
-        service = build('calendar', 'v3', credentials=credentials)
-        return service
+        # Parse JSON string to dictionary
+        credentials_info = json.loads(credentials_json)
+
+        # Validate required fields
+        required_fields = ['type', 'project_id', 'private_key', 'client_email']
+        missing = [f for f in required_fields if f not in credentials_info]
+        if missing:
+            raise Exception(f"Missing required fields in credentials: {missing}")
+
+        print(f"Credentials type: {credentials_info.get('type')}")
+        print(f"Project ID: {credentials_info.get('project_id')}")
+        print(f"Client email: {credentials_info.get('client_email')}")
+
+        # Create credentials object from dictionary (NOT from file!)
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=SCOPES
+        )
+
+        # Build the calendar service
+        _calendar_service = build('calendar', 'v3', credentials=credentials)
+        print("Google Calendar service created successfully!")
+
+        return _calendar_service
+
     except json.JSONDecodeError as e:
-        raise Exception(f"Invalid JSON in GOOGLE_CREDENTIALS_JSON: {str(e)}")
-    except FileNotFoundError:
-        raise Exception(f"Credentials file not found: {CREDENTIALS_FILE}. Set GOOGLE_CREDENTIALS_JSON in Railway.")
+        raise Exception(
+            f"GOOGLE_CREDENTIALS_JSON is not valid JSON: {str(e)}. "
+            "Make sure you copied the ENTIRE content of the JSON file, "
+            "including the curly braces {{ }}."
+        )
     except Exception as e:
         raise Exception(f"Failed to create calendar service: {str(e)}")
 
