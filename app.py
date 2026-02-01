@@ -6,7 +6,6 @@ Serves the static HTML/CSS/JS website and provides booking API
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from datetime import datetime, timedelta, date
 import os
-import threading
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -323,25 +322,18 @@ def book_appointment():
             print(f"Failed to create calendar event: {str(cal_error)}")
             # Continue - we'll still send confirmation email
 
-        # Send confirmation email in background thread to prevent worker timeout
-        def send_email_background(data):
-            try:
-                send_booking_confirmation(data)
-            except Exception as email_error:
-                print(f"Background email error: {str(email_error)}")
-
-        email_thread = threading.Thread(
-            target=send_email_background,
-            args=(booking_data.copy(),),
-            daemon=True
-        )
-        email_thread.start()
+        # Send confirmation email via SendGrid HTTP API
+        email_sent = False
+        try:
+            email_sent = send_booking_confirmation(booking_data)
+        except Exception as email_error:
+            print(f"Failed to send confirmation email: {str(email_error)}")
 
         return jsonify({
             "success": True,
             "message": "התור נקבע בהצלחה!",
             "event_id": event.get('id') if event else None,
-            "email_sent": "pending"
+            "email_sent": email_sent
         })
 
     except Exception as e:
