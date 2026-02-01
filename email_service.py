@@ -4,7 +4,11 @@ Handles sending booking confirmations and reminders
 """
 
 import os
+import sys
+import logging
 import smtplib
+import socket
+import traceback
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -12,7 +16,37 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Email configuration
+# Configure logging for production (Railway)
+# Force unbuffered output so logs appear immediately
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [EMAIL_SERVICE] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Force stdout to be unbuffered for Railway
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
+
+
+def get_smtp_config():
+    """
+    Get SMTP configuration from environment variables.
+    Fetches fresh values each time to handle runtime changes.
+    """
+    return {
+        'server': os.getenv('SMTP_SERVER', 'smtp.gmail.com'),
+        'port': int(os.getenv('SMTP_PORT', 587)),
+        'email': os.getenv('SMTP_EMAIL', ''),
+        'password': os.getenv('SMTP_PASSWORD', ''),
+        'sender_name': os.getenv('SMTP_SENDER_NAME', 'Nexora Digital'),
+    }
+
+
+# Legacy variables for backward compatibility
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
 SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 SMTP_EMAIL = os.getenv('SMTP_EMAIL', '')
@@ -201,41 +235,173 @@ def send_email(to_email, subject, html_content):
     Returns:
         True if sent successfully, False otherwise
     """
-    if not SMTP_EMAIL or not SMTP_PASSWORD:
-        print("Warning: SMTP credentials not configured (SMTP_EMAIL or SMTP_PASSWORD missing). Email not sent.")
-        print(f"SMTP_EMAIL configured: {bool(SMTP_EMAIL)}")
-        print(f"SMTP_PASSWORD configured: {bool(SMTP_PASSWORD)}")
+    # Get fresh SMTP config from environment
+    smtp_config = get_smtp_config()
+    smtp_email = smtp_config['email']
+    smtp_password = smtp_config['password']
+    smtp_server = smtp_config['server']
+    smtp_port = smtp_config['port']
+    smtp_sender_name = smtp_config['sender_name']
+
+    logger.info("=" * 50)
+    logger.info("EMAIL SEND ATTEMPT STARTED")
+    logger.info(f"To: {to_email}")
+    logger.info(f"Subject: {subject}")
+    logger.info(f"SMTP Server: {smtp_server}:{smtp_port}")
+    logger.info(f"SMTP Email configured: {bool(smtp_email)} (value: {smtp_email[:3]}...{smtp_email[-10:] if len(smtp_email) > 13 else '***'})" if smtp_email else "SMTP Email: NOT SET")
+    logger.info(f"SMTP Password configured: {bool(smtp_password)} (length: {len(smtp_password) if smtp_password else 0})")
+    sys.stdout.flush()
+
+    if not smtp_email or not smtp_password:
+        logger.error("SMTP CREDENTIALS MISSING!")
+        logger.error(f"  - SMTP_EMAIL is {'SET' if smtp_email else 'EMPTY/MISSING'}")
+        logger.error(f"  - SMTP_PASSWORD is {'SET' if smtp_password else 'EMPTY/MISSING'}")
+        logger.error("Please check Railway environment variables.")
+        sys.stdout.flush()
         return False
 
     try:
-        print(f"Attempting to send email to {to_email} via {SMTP_SERVER}:{SMTP_PORT}")
-
+        logger.info("Step 1: Building email message...")
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
-        msg['From'] = f'{SMTP_SENDER_NAME} <{SMTP_EMAIL}>'
+        msg['From'] = f'{smtp_sender_name} <{smtp_email}>'
         msg['To'] = to_email
 
         # Attach HTML content
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
+        logger.info("Step 1: Email message built successfully")
+        sys.stdout.flush()
 
-        # Connect and send
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        logger.info(f"Step 2: Connecting to SMTP server {smtp_server}:{smtp_port}...")
+        sys.stdout.flush()
+
+        # Set socket timeout to prevent hanging
+        socket.setdefaulttimeout(30)
+
+        with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
+            logger.info("Step 2: Connected to SMTP server")
+            sys.stdout.flush()
+
+            logger.info("Step 3: Starting TLS encryption...")
             server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.send_message(msg)
+            logger.info("Step 3: TLS encryption enabled")
+            sys.stdout.flush()
 
-        print(f"Email sent successfully to {to_email}")
+            logger.info("Step 4: Authenticating with SMTP server...")
+            sys.stdout.flush()
+            server.login(smtp_email, smtp_password)
+            logger.info("Step 4: Authentication successful")
+            sys.stdout.flush()
+
+            logger.info("Step 5: Sending email...")
+            sys.stdout.flush()
+            server.send_message(msg)
+            logger.info("Step 5: Email sent successfully")
+            sys.stdout.flush()
+
+        logger.info(f"SUCCESS: Email sent to {to_email}")
+        logger.info("=" * 50)
+        sys.stdout.flush()
         return True
 
     except smtplib.SMTPAuthenticationError as e:
-        print(f"SMTP Authentication failed - check SMTP_EMAIL and SMTP_PASSWORD: {str(e)}")
+        logger.error("=" * 50)
+        logger.error("SMTP AUTHENTICATION FAILED!")
+        logger.error(f"Error code: {e.smtp_code if hasattr(e, 'smtp_code') else 'N/A'}")
+        logger.error(f"Error message: {e.smtp_error if hasattr(e, 'smtp_error') else str(e)}")
+        logger.error("Possible causes:")
+        logger.error("  1. Wrong SMTP_EMAIL or SMTP_PASSWORD")
+        logger.error("  2. Gmail: Need to use App Password, not regular password")
+        logger.error("  3. Gmail: 2FA might be required with App Password")
+        logger.error("  4. Account may be locked or require verification")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
         return False
+
+    except smtplib.SMTPConnectError as e:
+        logger.error("=" * 50)
+        logger.error("SMTP CONNECTION FAILED!")
+        logger.error(f"Could not connect to {smtp_server}:{smtp_port}")
+        logger.error(f"Error: {str(e)}")
+        logger.error("Possible causes:")
+        logger.error("  1. Wrong SMTP_SERVER or SMTP_PORT")
+        logger.error("  2. Firewall blocking outbound SMTP")
+        logger.error("  3. Railway may block port 587 (try port 465 with SSL)")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
+        return False
+
+    except smtplib.SMTPRecipientsRefused as e:
+        logger.error("=" * 50)
+        logger.error("RECIPIENT REFUSED!")
+        logger.error(f"The recipient {to_email} was rejected by the server")
+        logger.error(f"Error: {str(e)}")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
+        return False
+
     except smtplib.SMTPException as e:
-        print(f"SMTP error: {str(e)}")
+        logger.error("=" * 50)
+        logger.error("SMTP ERROR!")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
         return False
+
+    except socket.timeout as e:
+        logger.error("=" * 50)
+        logger.error("SMTP CONNECTION TIMEOUT!")
+        logger.error(f"Connection to {smtp_server}:{smtp_port} timed out after 30 seconds")
+        logger.error("Possible causes:")
+        logger.error("  1. Network issues")
+        logger.error("  2. SMTP server is down")
+        logger.error("  3. Port might be blocked by Railway")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
+        return False
+
+    except socket.gaierror as e:
+        logger.error("=" * 50)
+        logger.error("DNS RESOLUTION FAILED!")
+        logger.error(f"Could not resolve hostname: {smtp_server}")
+        logger.error(f"Error: {str(e)}")
+        logger.error("Possible causes:")
+        logger.error("  1. Wrong SMTP_SERVER value")
+        logger.error("  2. Network/DNS issues")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
+        return False
+
     except Exception as e:
-        print(f"Failed to send email: {type(e).__name__}: {str(e)}")
+        logger.error("=" * 50)
+        logger.error("UNEXPECTED EMAIL ERROR!")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error(f"Error message: {str(e)}")
+        logger.error(f"Full exception: {repr(e)}")
+        logger.error("Traceback:")
+        logger.error(traceback.format_exc())
+        logger.error("=" * 50)
+        sys.stdout.flush()
         return False
 
 
@@ -243,24 +409,67 @@ def send_booking_confirmation(booking_data):
     """
     Send booking confirmation email to customer.
     """
-    subject, html_content = get_email_template(booking_data, 'confirmation')
-    return send_email(booking_data['email'], subject, html_content)
+    logger.info("=" * 50)
+    logger.info("BOOKING CONFIRMATION EMAIL TRIGGERED")
+    logger.info(f"Customer: {booking_data.get('name', 'N/A')}")
+    logger.info(f"Email: {booking_data.get('email', 'N/A')}")
+    logger.info(f"Service: {booking_data.get('service_he', booking_data.get('service', 'N/A'))}")
+    logger.info(f"Date: {booking_data.get('date', 'N/A')} at {booking_data.get('time', 'N/A')}")
+    sys.stdout.flush()
+
+    try:
+        subject, html_content = get_email_template(booking_data, 'confirmation')
+        result = send_email(booking_data['email'], subject, html_content)
+        logger.info(f"BOOKING CONFIRMATION RESULT: {'SUCCESS' if result else 'FAILED'}")
+        sys.stdout.flush()
+        return result
+    except Exception as e:
+        logger.error(f"BOOKING CONFIRMATION EXCEPTION: {type(e).__name__}: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.stdout.flush()
+        raise
 
 
 def send_reminder_day_before(booking_data):
     """
     Send reminder email one day before the appointment.
     """
-    subject, html_content = get_email_template(booking_data, 'reminder_day_before')
-    return send_email(booking_data['email'], subject, html_content)
+    logger.info("DAY-BEFORE REMINDER EMAIL TRIGGERED")
+    logger.info(f"Customer: {booking_data.get('name', 'N/A')} - {booking_data.get('email', 'N/A')}")
+    sys.stdout.flush()
+
+    try:
+        subject, html_content = get_email_template(booking_data, 'reminder_day_before')
+        result = send_email(booking_data['email'], subject, html_content)
+        logger.info(f"DAY-BEFORE REMINDER RESULT: {'SUCCESS' if result else 'FAILED'}")
+        sys.stdout.flush()
+        return result
+    except Exception as e:
+        logger.error(f"DAY-BEFORE REMINDER EXCEPTION: {type(e).__name__}: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.stdout.flush()
+        raise
 
 
 def send_reminder_morning(booking_data):
     """
     Send reminder email on the morning of the appointment.
     """
-    subject, html_content = get_email_template(booking_data, 'reminder_morning')
-    return send_email(booking_data['email'], subject, html_content)
+    logger.info("MORNING REMINDER EMAIL TRIGGERED")
+    logger.info(f"Customer: {booking_data.get('name', 'N/A')} - {booking_data.get('email', 'N/A')}")
+    sys.stdout.flush()
+
+    try:
+        subject, html_content = get_email_template(booking_data, 'reminder_morning')
+        result = send_email(booking_data['email'], subject, html_content)
+        logger.info(f"MORNING REMINDER RESULT: {'SUCCESS' if result else 'FAILED'}")
+        sys.stdout.flush()
+        return result
+    except Exception as e:
+        logger.error(f"MORNING REMINDER EXCEPTION: {type(e).__name__}: {str(e)}")
+        logger.error(traceback.format_exc())
+        sys.stdout.flush()
+        raise
 
 
 def get_reminders_to_send():
