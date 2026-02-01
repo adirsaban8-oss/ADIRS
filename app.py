@@ -251,60 +251,83 @@ def get_available_slots():
 
         # Filter out busy slots from Google Calendar
         # Pass service duration to prevent overlapping appointments
-        available_slots = filter_available_slots(date_str, all_slots, service_duration)
+        try:
+            available_slots = filter_available_slots(date_str, all_slots, service_duration)
+        except Exception as cal_error:
+            print(f"Calendar error (returning all slots): {str(cal_error)}")
+            available_slots = all_slots  # Graceful fallback
 
         return jsonify({"slots": available_slots})
 
     except ValueError:
         return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+    except Exception as e:
+        print(f"Error in get_available_slots: {str(e)}")
+        return jsonify({"error": "שגיאה בקבלת שעות פנויות"}), 500
 
 
 @app.route('/api/book', methods=['POST'])
 def book_appointment():
     """Create a new booking"""
-    data = request.json
-
-    if not data:
-        return jsonify({"error": "Invalid JSON data"}), 400
-
-    # Validate required fields
-    required_fields = ['name', 'phone', 'email', 'service', 'date', 'time']
-    for field in required_fields:
-        if not data.get(field):
-            return jsonify({"error": f"Missing required field: {field}"}), 400
-
-    # Find service details
-    service = None
-    for s in SERVICES:
-        if s['name'] == data['service'] or s['name_he'] == data['service']:
-            service = s
-            break
-
-    if not service:
-        return jsonify({"error": "Invalid service"}), 400
-
-    # Check availability
-    if not check_availability(data['date'], data['time'], service['duration']):
-        return jsonify({"error": "התור כבר לא פנוי. נא לבחור שעה אחרת."}), 409
-
-    # Create booking
-    booking_data = {
-        "name": data['name'],
-        "phone": data['phone'],
-        "email": data['email'],
-        "service": service['name'],
-        "service_he": service['name_he'],
-        "date": data['date'],
-        "time": data['time'],
-        "duration": service['duration'],
-        "notes": data.get('notes', ''),
-    }
-
     try:
-        event = create_event(booking_data)
+        data = request.json
+
+        if not data:
+            return jsonify({"error": "Invalid JSON data"}), 400
+
+        # Validate required fields
+        required_fields = ['name', 'phone', 'email', 'service', 'date', 'time']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        # Find service details
+        service = None
+        for s in SERVICES:
+            if s['name'] == data['service'] or s['name_he'] == data['service']:
+                service = s
+                break
+
+        if not service:
+            return jsonify({"error": "Invalid service"}), 400
+
+        # Check availability (with error handling)
+        try:
+            is_available = check_availability(data['date'], data['time'], service['duration'])
+            if not is_available:
+                return jsonify({"error": "התור כבר לא פנוי. נא לבחור שעה אחרת."}), 409
+        except Exception as cal_error:
+            print(f"Calendar check error (proceeding anyway): {str(cal_error)}")
+            # Continue with booking even if calendar check fails
+
+        # Create booking
+        booking_data = {
+            "name": data['name'],
+            "phone": data['phone'],
+            "email": data['email'],
+            "service": service['name'],
+            "service_he": service['name_he'],
+            "date": data['date'],
+            "time": data['time'],
+            "duration": service['duration'],
+            "notes": data.get('notes', ''),
+        }
+
+        # Try to create calendar event
+        event = None
+        try:
+            event = create_event(booking_data)
+            print(f"Calendar event created: {event.get('id') if event else 'N/A'}")
+        except Exception as cal_error:
+            print(f"Failed to create calendar event: {str(cal_error)}")
+            # Continue - we'll still send confirmation email
 
         # Send confirmation email
-        email_sent = send_booking_confirmation(booking_data)
+        email_sent = False
+        try:
+            email_sent = send_booking_confirmation(booking_data)
+        except Exception as email_error:
+            print(f"Failed to send confirmation email: {str(email_error)}")
 
         return jsonify({
             "success": True,
@@ -312,8 +335,12 @@ def book_appointment():
             "event_id": event.get('id') if event else None,
             "email_sent": email_sent
         })
+
     except Exception as e:
-        return jsonify({"error": f"שגיאה ביצירת התור: {str(e)}"}), 500
+        print(f"Booking error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": "שגיאה בקביעת התור. נסה שוב."}), 500
 
 
 @app.route('/api/contact', methods=['POST'])

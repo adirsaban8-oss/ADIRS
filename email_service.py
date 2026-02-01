@@ -202,10 +202,14 @@ def send_email(to_email, subject, html_content):
         True if sent successfully, False otherwise
     """
     if not SMTP_EMAIL or not SMTP_PASSWORD:
-        print("Warning: SMTP credentials not configured. Email not sent.")
+        print("Warning: SMTP credentials not configured (SMTP_EMAIL or SMTP_PASSWORD missing). Email not sent.")
+        print(f"SMTP_EMAIL configured: {bool(SMTP_EMAIL)}")
+        print(f"SMTP_PASSWORD configured: {bool(SMTP_PASSWORD)}")
         return False
 
     try:
+        print(f"Attempting to send email to {to_email} via {SMTP_SERVER}:{SMTP_PORT}")
+
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = f'{SMTP_SENDER_NAME} <{SMTP_EMAIL}>'
@@ -224,10 +228,14 @@ def send_email(to_email, subject, html_content):
         print(f"Email sent successfully to {to_email}")
         return True
 
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"SMTP Authentication failed - check SMTP_EMAIL and SMTP_PASSWORD: {str(e)}")
+        return False
+    except smtplib.SMTPException as e:
+        print(f"SMTP error: {str(e)}")
+        return False
     except Exception as e:
-        # Log error without exposing credentials
-        error_type = type(e).__name__
-        print(f"Failed to send email: {error_type}")
+        print(f"Failed to send email: {type(e).__name__}: {str(e)}")
         return False
 
 

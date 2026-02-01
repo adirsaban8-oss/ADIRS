@@ -29,21 +29,31 @@ def get_calendar_service():
     Supports both file-based and environment variable credentials.
     """
     try:
-        # Try to load from environment variable first (for production)
+        # Try to load from environment variable first (for production/Railway)
         if CREDENTIALS_JSON:
+            print("Using GOOGLE_CREDENTIALS_JSON from environment")
             credentials_info = json.loads(CREDENTIALS_JSON)
             credentials = service_account.Credentials.from_service_account_info(
                 credentials_info, scopes=SCOPES
             )
-        else:
+        elif os.path.exists(CREDENTIALS_FILE):
             # Fall back to file-based credentials (for local development)
+            print(f"Using credentials file: {CREDENTIALS_FILE}")
             credentials = service_account.Credentials.from_service_account_file(
                 CREDENTIALS_FILE, scopes=SCOPES
             )
+        else:
+            raise Exception(
+                "Google Calendar credentials not configured. "
+                "Set GOOGLE_CREDENTIALS_JSON environment variable in Railway "
+                "with the contents of your service account JSON file."
+            )
         service = build('calendar', 'v3', credentials=credentials)
         return service
+    except json.JSONDecodeError as e:
+        raise Exception(f"Invalid JSON in GOOGLE_CREDENTIALS_JSON: {str(e)}")
     except FileNotFoundError:
-        raise Exception(f"Credentials file not found: {CREDENTIALS_FILE}")
+        raise Exception(f"Credentials file not found: {CREDENTIALS_FILE}. Set GOOGLE_CREDENTIALS_JSON in Railway.")
     except Exception as e:
         raise Exception(f"Failed to create calendar service: {str(e)}")
 
