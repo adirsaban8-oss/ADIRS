@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="LISHAY SIMANI - מניקוריסטית מקצועית בקרני שומרון. טיפולי ציפורניים יוקרתיים, בנייה, ג'ל, גבות ועוד. הזמיני תור עכשיו!">
+    <meta name="keywords" content="מניקור, פדיקור, ציפורניים, בנייה, ג'ל, גבות, קרני שומרון, לישי סימני">
+    <title>LISHAY SIMANI | מניקוריסטית מקצועית</title>
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <!-- Fonts - Premium Luxury Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Frank+Ruhl+Libre:wght@300;400;500;700&family=Heebo:wght@200;300;400;500&display=swap" rel="stylesheet">
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="styles/reset.css">
+    <link rel="stylesheet" href="styles/variables.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link rel="stylesheet" href="styles/main.css">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💅</text></svg>">
+</head>
+<body>
+    <!-- בס"ד -->
+    <div style="position: fixed; top: 10px; left: 20px; font-size: 14px; font-weight: bold; color: var(--color-text-primary); z-index: 1000;">בס"ד</div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <a href="#home" class="nav-logo">LISHAY SIMANI</a>
+
+            <button class="nav-toggle" id="navToggle" aria-label="תפריט">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#home" class="nav-link active">בית</a></li>
+                <li><a href="#services" class="nav-link">שירותים</a></li>
+                <li><a href="#policies" class="nav-link">מדיניות</a></li>
+                <li><a href="#booking" class="nav-link">הזמנת תור</a></li>
+                <li><a href="#gallery" class="nav-link">גלריה</a></li>
+                <li><a href="#contact" class="nav-link">צור קשר</a></li>
+                <li><a href="#about" class="nav-link">אודות</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">✦ LUXURY NAIL ART ✦</div>
+            <h1 class="hero-title">
+                <span>LISHAY</span>
+                <span class="gold">SIMANI</span>
+            </h1>
+            <p class="hero-subtitle">מניקוריסטית מקצועית</p>
+            <p class="hero-tagline">יוקרה, מקצועיות ודיוק בכל ציפורן</p>
+            <div class="hero-buttons">
+                <a href="#booking" class="btn btn-primary btn-lg">הזמיני תור</a>
+                <a href="#services" class="btn btn-outline btn-lg">השירותים שלנו</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Services Section -->
+    <section id="services" class="services section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">השירותים שלנו</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">טיפולים יוקרתיים במחירים הוגנים</p>
+            </div>
+
+            <div class="services-grid">
+                <!-- Service Card 1 -->
+                <a href="#booking" class="service-card fade-in" data-service="gel-polish">
+                    <div class="service-card-icon">
+                        <i class="fas fa-paint-brush"></i>
+                    </div>
+                    <h3 class="service-card-name">לק ג'ל</h3>
+                    <p class="service-card-name-en">Gel Polish</p>
+                    <p class="service-card-price">120₪</p>
+                    <p class="service-card-duration">60 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 2 -->
+                <a href="#booking" class="service-card fade-in" data-service="anatomical-build">
+                    <div class="service-card-icon">
+                        <i class="fas fa-magic"></i>
+                    </div>
+                    <h3 class="service-card-name">בנייה אנטומית</h3>
+                    <p class="service-card-name-en">Anatomical Build</p>
+                    <p class="service-card-price">140₪</p>
+                    <p class="service-card-duration">75 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 3 -->
+                <a href="#booking" class="service-card fade-in" data-service="gel-fill">
+                    <div class="service-card-icon">
+                        <i class="fas fa-sync-alt"></i>
+                    </div>
+                    <h3 class="service-card-name">מילוי ג'ל</h3>
+                    <p class="service-card-name-en">Gel Fill</p>
+                    <p class="service-card-price">150₪</p>
+                    <p class="service-card-duration">60 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 4 -->
+                <a href="#booking" class="service-card fade-in" data-service="building">
+                    <div class="service-card-icon">
+                        <i class="fas fa-gem"></i>
+                    </div>
+                    <h3 class="service-card-name">בנייה</h3>
+                    <p class="service-card-name-en">Building</p>
+                    <p class="service-card-price">300₪</p>
+                    <p class="service-card-duration">120 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 5 -->
+                <a href="#booking" class="service-card fade-in" data-service="eyebrows">
+                    <div class="service-card-icon">
+                        <i class="fas fa-eye"></i>
+                    </div>
+                    <h3 class="service-card-name">גבות</h3>
+                    <p class="service-card-name-en">Eyebrows</p>
+                    <p class="service-card-price">50₪</p>
+                    <p class="service-card-duration">20 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 6 -->
+                <a href="#booking" class="service-card fade-in" data-service="mustache">
+                    <div class="service-card-icon">
+                        <i class="fas fa-feather"></i>
+                    </div>
+                    <h3 class="service-card-name">שפם</h3>
+                    <p class="service-card-name-en">Mustache</p>
+                    <p class="service-card-price">15₪</p>
+                    <p class="service-card-duration">10 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+
+                <!-- Service Card 7 -->
+                <a href="#booking" class="service-card fade-in" data-service="eyebrow-tinting">
+                    <div class="service-card-icon">
+                        <i class="fas fa-palette"></i>
+                    </div>
+                    <h3 class="service-card-name">צביעת גבות</h3>
+                    <p class="service-card-name-en">Eyebrow Tinting</p>
+                    <p class="service-card-price">30₪</p>
+                    <p class="service-card-duration">15 דקות</p>
+                    <span class="service-card-btn">הזמיני עכשיו</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Policies Section -->
+    <section id="policies" class="policies section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">מדיניות ביטולים</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">לשמירה על כבוד הדדי וזמן של כולנו</p>
+            </div>
+
+            <div class="policies-grid">
+                <div class="policy-card fade-in">
+                    <div class="policy-card-icon">⚠️</div>
+                    <h4 class="policy-card-title">ביטול באותו היום</h4>
+                    <p class="policy-card-text">חיוב של 50% מעלות הטיפול</p>
+                </div>
+
+                <div class="policy-card fade-in">
+                    <div class="policy-card-icon">❌</div>
+                    <h4 class="policy-card-title">אי הגעה ללא הודעה</h4>
+                    <p class="policy-card-text">חיוב מלא של עלות הטיפול</p>
+                </div>
+
+                <div class="policy-card fade-in">
+                    <div class="policy-card-icon">🕐</div>
+                    <h4 class="policy-card-title">איחור של מעל 15 דקות</h4>
+                    <p class="policy-card-text">ללא הודעה מראש - ייחשב כביטול עם חיוב של 50%</p>
+                </div>
+            </div>
+
+            <p style="text-align: center; margin-top: var(--space-xl); color: var(--color-text-secondary);">תודה על ההבנה 🤍</p>
+        </div>
+    </section>
+
+    <!-- Booking Section -->
+    <section id="booking" class="booking section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">הזמנת תור</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">בחרי תאריך ושעה שנוחים לך</p>
+            </div>
+
+            <div class="booking-container">
+                <!-- Info Cards -->
+                <div class="booking-info">
+                    <div class="info-card">
+                        <div class="info-card-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="info-card-content">
+                            <h4>שעות פעילות</h4>
+                            <p>ראשון - חמישי: 09:00 - 20:00</p>
+                            <p>שישי - שבת: סגור</p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-card-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="info-card-content">
+                            <h4>מיקום</h4>
+                            <p>משעול הרקפת 3</p>
+                            <p>קרני שומרון</p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="info-card-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="info-card-content">
+                            <h4>טלפון</h4>
+                            <p><a href="tel:051-5656295">051-5656295</a></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Booking Form -->
+                <div class="booking-form-wrapper">
+                    <form class="booking-form" id="bookingForm">
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label class="input-label">שם מלא</label>
+                                <input type="text" class="input" name="name" placeholder="הכניסי את שמך" required>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">טלפון</label>
+                                <input type="tel" class="input" name="phone" placeholder="050-0000000" required>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">אימייל</label>
+                            <input type="email" class="input" name="email" placeholder="your@email.com" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">בחרי שירות</label>
+                            <select class="input input-select" name="service" required>
+                                <option value="">בחרי טיפול...</option>
+                                <option value="gel-polish" data-duration="60">לק ג'ל - 120₪</option>
+                                <option value="anatomical-build" data-duration="75">בנייה אנטומית - 140₪</option>
+                                <option value="gel-fill" data-duration="60">מילוי ג'ל - 150₪</option>
+                                <option value="building" data-duration="120">בנייה - 300₪</option>
+                                <option value="eyebrows" data-duration="20">גבות - 50₪</option>
+                                <option value="mustache" data-duration="10">שפם - 15₪</option>
+                                <option value="eyebrow-tinting" data-duration="15">צביעת גבות - 30₪</option>
+                            </select>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="input-group">
+                                <label class="input-label">תאריך</label>
+                                <input type="date" class="input" name="date" id="dateInput" required>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label">שעה</label>
+                                <div class="time-slots" id="timeSlots">
+                                    <p class="loading" style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">הערות (אופציונלי)</label>
+                            <textarea class="input input-textarea" name="notes" placeholder="הערות נוספות..."></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full-width btn-lg">
+                            <i class="fas fa-calendar-check"></i>
+                            אשרי הזמנה
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gallery Section -->
+    <section id="gallery" class="gallery section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">גלריה</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">העבודות שלי - כל עבודה היא יצירת אמנות</p>
+            </div>
+
+            <div class="gallery-grid">
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery1.jpeg" alt="עיצוב ציפורניים שחור מרבל" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>עיצוב מושלם</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery2.jpeg" alt="עיצוב ציפורניים צבעוני" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>דיוק מושלם</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery3.jpeg" alt="עיצוב ציפורניים נוד" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>עיצוב ייחודי</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery4.jpeg" alt="פרנץ מניקור עם דובדבנים" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>מראה מרהיב</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery5.jpeg" alt="עיצוב ציפורניים אדום" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>פינוק מלכותי</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery6.jpeg" alt="עיצוב ציפורניים ורוד וטורקיז" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>יוקרה ואלגנטיות</span>
+                    </div>
+                </div>
+                <div class="gallery-item fade-in">
+                    <img src="static/images/gallery7.jpeg" alt="פרנץ מניקור עם נקודות" loading="lazy">
+                    <div class="gallery-overlay">
+                        <span>תוצאה מושלמת</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="gallery-note">
+                <i class="fas fa-camera"></i>
+                התמונות מציגות עבודות מקוריות של לישי סימני
+            </p>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">צור קשר</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">נשמח לשמוע ממך</p>
+            </div>
+
+            <div class="contact-container">
+                <!-- Contact Info -->
+                <div class="contact-info">
+                    <h3>פרטי התקשרות</h3>
+
+                    <div class="contact-item">
+                        <div class="contact-item-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="contact-item-content">
+                            <h4>כתובת</h4>
+                            <p>משעול הרקפת 3, קרני שומרון</p>
+                        </div>
+                    </div>
+
+                    <div class="contact-item">
+                        <div class="contact-item-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="contact-item-content">
+                            <h4>טלפון</h4>
+                            <p><a href="tel:051-5656295">051-5656295</a></p>
+                        </div>
+                    </div>
+
+                    <div class="contact-item">
+                        <div class="contact-item-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="contact-item-content">
+                            <h4>שעות פעילות</h4>
+                            <p>ראשון - חמישי: 09:00 - 20:00</p>
+                            <p>שישי - שבת: סגור</p>
+                        </div>
+                    </div>
+
+                    <div class="social-links">
+                        <a href="https://www.instagram.com/lishai_simani_beauty" target="_blank" class="social-link" aria-label="Instagram">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="https://wa.me/972515656295?text=Hi%20I%20came%20from%20the%20website" target="_blank" class="social-link" aria-label="WhatsApp">
+                            <i class="fab fa-whatsapp"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Contact Form -->
+                <div class="contact-form-wrapper">
+                    <form class="contact-form" id="contactForm">
+                        <div class="input-group">
+                            <label class="input-label">שם מלא</label>
+                            <input type="text" class="input" name="name" placeholder="הכניסי את שמך" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">טלפון</label>
+                            <input type="tel" class="input" name="phone" placeholder="050-0000000" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label class="input-label">הודעה</label>
+                            <textarea class="input input-textarea" name="message" placeholder="כתבי את הודעתך..." required></textarea>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-full-width btn-lg">
+                            <i class="fas fa-paper-plane"></i>
+                            שלחי הודעה
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="about section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">אודות</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">הכירי את לישי</p>
+            </div>
+
+            <div class="about-content">
+                <div class="about-image">
+                    <div class="about-image-frame">
+                        <div class="about-image-placeholder">
+                            <i class="fas fa-spa"></i>
+                            <span>LISHAY SIMANI</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="about-text">
+                    <h3>מקצועיות, יוקרה ואהבה לכל פרט</h3>
+                    <p>
+                        שלום, אני לישי סימני, מניקוריסטית מקצועית עם תשוקה אמיתית לאמנות הציפורניים.
+                        בסטודיו שלי בקרני שומרון, אני מציעה חוויה יוקרתית ואישית לכל לקוחה.
+                    </p>
+                    <p>
+                        אני מאמינה שכל אישה ראויה להרגיש מפונקת ויפה.
+                        בכל טיפול אני משקיעה תשומת לב מלאה לפרטים הקטנים ביותר,
+                        משתמשת בחומרים איכותיים בלבד ומקפידה על סטריליות מושלמת.
+                    </p>
+
+                    <div class="about-features">
+                        <div class="about-feature">
+                            <div class="about-feature-icon"><i class="fas fa-award"></i></div>
+                            <span>מקצועיות</span>
+                        </div>
+                        <div class="about-feature">
+                            <div class="about-feature-icon"><i class="fas fa-gem"></i></div>
+                            <span>יוקרה</span>
+                        </div>
+                        <div class="about-feature">
+                            <div class="about-feature-icon"><i class="fas fa-heart"></i></div>
+                            <span>אכפתיות</span>
+                        </div>
+                        <div class="about-feature">
+                            <div class="about-feature-icon"><i class="fas fa-shield-alt"></i></div>
+                            <span>היגיינה</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <h3>LISHAY SIMANI</h3>
+                    <p>מניקוריסטית מקצועית</p>
+                    <p>יוקרה, מקצועיות ודיוק</p>
+                </div>
+
+                <div class="footer-links">
+                    <h4>ניווט מהיר</h4>
+                    <ul>
+                        <li><a href="#home">בית</a></li>
+                        <li><a href="#services">שירותים</a></li>
+                        <li><a href="#policies">מדיניות</a></li>
+                        <li><a href="#booking">הזמנת תור</a></li>
+                        <li><a href="#gallery">גלריה</a></li>
+                        <li><a href="#contact">צור קשר</a></li>
+                        <li><a href="#about">אודות</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-contact">
+                    <h4>יצירת קשר</h4>
+                    <p><i class="fas fa-map-marker-alt"></i> משעול הרקפת 3, קרני שומרון</p>
+                    <p><i class="fas fa-phone-alt"></i> <a href="tel:051-5656295">051-5656295</a></p>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>© 2024 LISHAY SIMANI. כל הזכויות שמורות.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Success Modal -->
+    <div class="modal-overlay" id="successModal">
+        <div class="modal">
+            <div class="modal-icon">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 class="modal-title">התור נקבע בהצלחה!</h3>
+            <p class="modal-text">נשלח אלייך אישור במייל. נשמח לראותך!</p>
+            <button class="btn btn-primary" onclick="closeModal()">סגור</button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="scripts/main.js"></script>
+</body>
+</html>

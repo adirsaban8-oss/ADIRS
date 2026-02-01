@@ -1,5 +1,5 @@
 /* ========================================
-   LISHAI SIMAN - Luxury Nail Studio
+   LISHAY SIMANI - Luxury Nail Studio
    Main JavaScript
    ======================================== */
 

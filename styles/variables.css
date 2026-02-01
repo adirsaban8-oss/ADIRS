@@ -1,0 +1,138 @@
+/* ============================================
+   DESIGN TOKENS - LISHAY SIMANI BEAUTY STUDIO
+   LUXURY EDITION - Cream & Gold
+   ============================================ */
+
+:root {
+  /* ============== LUXURY COLORS ============== */
+
+  /* Background Colors - Rich Cream */
+  --color-bg-primary: #FBF6EE;        /* Rich warm cream */
+  --color-bg-secondary: #F5EFE3;      /* Soft cream */
+  --color-bg-card: #FFFCF5;           /* Warm white for cards */
+  --color-bg-dark: #2C2620;           /* Deep espresso */
+
+  /* Text Colors */
+  --color-text-primary: #1A1714;      /* Rich black-brown */
+  --color-text-secondary: #5C5650;    /* Warm gray */
+  --color-text-tertiary: #8A847C;     /* Muted taupe */
+  --color-text-light: #FFFDF9;        /* Light text on dark bg */
+
+  /* Gold Accent Colors - Warm Elegant Gold */
+  --color-gold: #C4A35A;              /* Warm elegant gold */
+  --color-gold-light: #D4B76A;        /* Soft warm gold */
+  --color-gold-dark: #A68B4B;         /* Deep warm gold */
+  --color-gold-shine: #CBAB60;        /* Warm golden accent */
+  --color-gold-muted: #B89850;        /* Rich gold */
+  --color-gold-glow: rgba(196, 163, 90, 0.25); /* Soft warm glow */
+  --color-gold-gradient: linear-gradient(135deg, #A68B4B 0%, #C4A35A 50%, #A68B4B 100%);
+
+  /* Accent Colors */
+  --color-accent-pink: #F5E6E0;       /* Soft rose blush */
+  --color-accent-cream: #F5EDE4;      /* Cream accent */
+  --color-accent-bronze: #A67C52;     /* Bronze accent */
+
+  /* Functional Colors */
+  --color-border: #E8E0D5;            /* Warm border */
+  --color-border-gold: rgba(201, 168, 108, 0.3); /* Gold border */
+  --color-focus: rgba(201, 168, 108, 0.4);
+  --color-shadow: rgba(26, 23, 20, 0.08);
+  --color-shadow-gold: rgba(201, 168, 108, 0.15);
+  --color-success: #D4EDDA;
+  --color-success-text: #155724;
+  --color-error: #F8D7DA;
+  --color-error-text: #721C24;
+
+  /* ============== PREMIUM LUXURY TYPOGRAPHY ============== */
+
+  /* Font Families - Refined & Elegant */
+  --font-primary: 'Heebo', -apple-system, system-ui, sans-serif;
+  --font-hebrew-heading: 'Frank Ruhl Libre', 'Heebo', serif;
+  --font-english-display: 'Cormorant Garamond', 'Times New Roman', serif;
+  --font-luxury: 'Frank Ruhl Libre', 'Heebo', serif;
+  --font-display: 'Cormorant Garamond', serif;
+  --font-elegant: 'Cormorant Garamond', serif;
+
+  /* Font Sizes - Refined Scale */
+  --font-size-display: clamp(3.5rem, 7vw, 6rem);
+  --font-size-h1: clamp(2.75rem, 5.5vw, 4.5rem);
+  --font-size-h2: clamp(2rem, 4vw, 2.75rem);
+  --font-size-h3: clamp(1.5rem, 3vw, 1.875rem);
+  --font-size-h4: clamp(1.125rem, 2vw, 1.375rem);
+  --font-size-body: clamp(0.9375rem, 1.8vw, 1.0625rem);
+  --font-size-small: 0.8125rem;
+  --font-size-xs: 0.75rem;
+
+  /* Font Weights - Light & Airy */
+  --font-weight-thin: 200;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 500;
+
+  /* Line Heights - Spacious */
+  --line-height-tight: 1.15;
+  --line-height-heading: 1.25;
+  --line-height-normal: 1.7;
+  --line-height-relaxed: 1.9;
+
+  /* Letter Spacing - Refined */
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-normal: 0.01em;
+  --letter-spacing-wide: 0.15em;
+  --letter-spacing-luxury: 0.25em;
+  --letter-spacing-editorial: 0.35em;
+
+  /* ============== SPACING ============== */
+
+  --space-xs: 0.5rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 8rem;
+
+  /* ============== LAYOUT ============== */
+
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1200px;
+
+  --section-padding-y: clamp(4rem, 10vw, 8rem);
+  --section-padding-x: clamp(1.5rem, 5vw, 3rem);
+
+  /* ============== LUXURY EFFECTS ============== */
+
+  /* Border Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 30px;
+  --radius-full: 50px;
+
+  /* Shadows - Warm Gold Tinted */
+  --shadow-sm: 0 2px 10px var(--color-shadow);
+  --shadow-md: 0 8px 30px var(--color-shadow);
+  --shadow-lg: 0 15px 50px var(--color-shadow);
+  --shadow-gold: 0 8px 25px rgba(196, 163, 90, 0.2);
+  --shadow-gold-glow: 0 0 20px rgba(196, 163, 90, 0.25);
+  --shadow-luxury: 0 15px 40px rgba(196, 163, 90, 0.22);
+  --shadow-gold-intense: 0 10px 30px rgba(196, 163, 90, 0.25);
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --transition-luxury: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* ============== BREAKPOINTS ============== */
+
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+}

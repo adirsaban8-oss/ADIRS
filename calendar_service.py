@@ -208,17 +208,22 @@ def create_event(booking_data):
         raise Exception(f"Failed to create event: {str(e)}")
 
 
-def filter_available_slots(date_str, all_slots, slot_duration=30):
+def filter_available_slots(date_str, all_slots, service_duration=30):
     """
     Filter out busy slots from a list of available time slots.
+
+    This function checks each potential slot against existing calendar events
+    and ensures there's no overlap for the FULL duration of the requested service.
 
     Args:
         date_str: Date in 'YYYY-MM-DD' format
         all_slots: List of time slots in 'HH:MM' format
-        slot_duration: Duration of each slot in minutes (default 30)
+        service_duration: Duration of the service in minutes (default 30)
+                         This is the FULL duration the customer's appointment will take
 
     Returns:
-        List of available time slots
+        List of available time slots where the full service can be performed
+        without overlapping any existing appointments
     """
     try:
         busy_slots = get_busy_slots(date_str)
@@ -226,14 +231,17 @@ def filter_available_slots(date_str, all_slots, slot_duration=30):
 
         for slot in all_slots:
             slot_start = datetime.strptime(slot, '%H:%M')
-            slot_end = slot_start + timedelta(minutes=slot_duration)
+            # Calculate when this service would END based on its full duration
+            slot_end = slot_start + timedelta(minutes=service_duration)
 
             is_available = True
             for busy_start_str, busy_end_str in busy_slots:
                 busy_start = datetime.strptime(busy_start_str, '%H:%M')
                 busy_end = datetime.strptime(busy_end_str, '%H:%M')
 
-                # Check if there's any overlap
+                # Check if there's ANY overlap between the requested appointment
+                # (slot_start to slot_end) and an existing appointment (busy_start to busy_end)
+                # Overlap occurs when: NOT (new_end <= existing_start OR new_start >= existing_end)
                 if not (slot_end <= busy_start or slot_start >= busy_end):
                     is_available = False
                     break
