@@ -6,6 +6,7 @@ Serves the static HTML/CSS/JS website and provides booking API
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from datetime import datetime, timedelta, date
 import os
+import threading
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -31,6 +32,9 @@ from email_service import (
     get_email_template,
     send_email
 )
+
+# Import WhatsApp service
+from whatsapp_service import send_whatsapp_booking_confirmation
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 
@@ -214,6 +218,7 @@ def health():
         "timestamp": datetime.now(ISRAEL_TZ).isoformat(),
         "email": bool(os.getenv('SENDGRID_API_KEY')),
         "calendar": bool(os.getenv('GOOGLE_CREDENTIALS') or os.getenv('GOOGLE_CREDENTIALS_JSON')),
+        "whatsapp": os.getenv('WHATSAPP_ENABLED', 'false').lower() == 'true',
     }
     return jsonify(health_status), 200
 
@@ -342,6 +347,17 @@ def book_appointment():
             email_sent = send_booking_confirmation(booking_data)
         except Exception as email_error:
             print(f"Failed to send confirmation email: {str(email_error)}")
+
+        # Send WhatsApp confirmation in background (non-blocking)
+        try:
+            wa_thread = threading.Thread(
+                target=send_whatsapp_booking_confirmation,
+                args=(booking_data,),
+                daemon=True
+            )
+            wa_thread.start()
+        except Exception as wa_error:
+            print(f"Failed to start WhatsApp thread: {str(wa_error)}")
 
         return jsonify({
             "success": True,
