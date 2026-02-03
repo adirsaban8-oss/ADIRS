@@ -199,8 +199,43 @@ async function loadTimeSlots(date, dateStr) {
 
 // ============== BOOKING FORM ==============
 
+let isBookingSubmitting = false;
+
+function validateBookingData(data) {
+    const errors = [];
+
+    if (!data.name || data.name.trim().length < 2) {
+        errors.push('נא להזין שם מלא');
+    }
+
+    const phoneClean = (data.phone || '').replace(/[-\s]/g, '');
+    if (!phoneClean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(phoneClean)) {
+        errors.push('נא להזין מספר טלפון תקין');
+    }
+
+    if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        errors.push('נא להזין כתובת אימייל תקינה');
+    }
+
+    if (!data.service) {
+        errors.push('נא לבחור שירות');
+    }
+
+    if (!data.date) {
+        errors.push('נא לבחור תאריך');
+    }
+
+    if (!data.time) {
+        errors.push('נא לבחור שעה');
+    }
+
+    return errors;
+}
+
 bookingForm.addEventListener('submit', async (e) => {
     e.preventDefault();
+
+    if (isBookingSubmitting) return;
 
     const selectedTimeSlot = document.querySelector('.time-slot.selected');
     if (!selectedTimeSlot) {
@@ -222,35 +257,36 @@ bookingForm.addEventListener('submit', async (e) => {
         notes: formData.get('notes') || ''
     };
 
-    // Validate form
-    if (!bookingData.name || !bookingData.phone || !bookingData.email || !bookingData.service || !bookingData.date) {
-        alert('נא למלא את כל השדות הנדרשים');
+    const errors = validateBookingData(bookingData);
+    if (errors.length > 0) {
+        alert(errors.join('\n'));
         return;
     }
 
-    // Show loading state
+    isBookingSubmitting = true;
     const submitBtn = bookingForm.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח...';
     submitBtn.disabled = true;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
     try {
-        // Send to API
         const response = await fetch(`${CONFIG.API_BASE}/api/book`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(bookingData)
+            body: JSON.stringify(bookingData),
+            signal: controller.signal
         });
 
+        clearTimeout(timeoutId);
         const result = await response.json();
 
         if (response.ok && result.success) {
-            // Show success modal
             showModal();
-
-            // Reset form
             bookingForm.reset();
             timeSlotsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>';
         } else {
@@ -258,9 +294,15 @@ bookingForm.addEventListener('submit', async (e) => {
         }
 
     } catch (error) {
+        clearTimeout(timeoutId);
         console.error('Booking error:', error);
-        alert('אירעה שגיאה. נסי שוב.');
+        if (error.name === 'AbortError') {
+            alert('הבקשה נמשכה זמן רב מדי. נא לנסות שוב.');
+        } else {
+            alert('אירעה שגיאה בשליחת הטופס. נסי שוב או התקשרי אלינו.');
+        }
     } finally {
+        isBookingSubmitting = false;
         submitBtn.innerHTML = originalText;
         submitBtn.disabled = false;
     }
@@ -393,3 +435,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Make closeModal available globally
 window.closeModal = closeModal;
+
+// ============== SERVICE CARD AUTO-SELECT ==============
+
+document.querySelectorAll('.service-card[data-service]').forEach(card => {
+    card.addEventListener('click', () => {
+        const serviceKey = card.dataset.service;
+        const select = document.querySelector('select[name="service"]');
+        if (select && serviceKey) {
+            select.value = serviceKey;
+            select.dispatchEvent(new Event('change'));
+        }
+    });
+});

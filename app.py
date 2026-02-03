@@ -204,6 +204,20 @@ def serve_static(filename):
     return send_from_directory('static', filename)
 
 
+# ============== HEALTH CHECK ==============
+
+@app.route('/health')
+def health():
+    """Health check for Railway monitoring"""
+    health_status = {
+        "status": "ok",
+        "timestamp": datetime.now(ISRAEL_TZ).isoformat(),
+        "email": bool(os.getenv('SENDGRID_API_KEY')),
+        "calendar": bool(os.getenv('GOOGLE_CREDENTIALS') or os.getenv('GOOGLE_CREDENTIALS_JSON')),
+    }
+    return jsonify(health_status), 200
+
+
 # ============== API ENDPOINTS ==============
 
 @app.route('/api/services', methods=['GET'])

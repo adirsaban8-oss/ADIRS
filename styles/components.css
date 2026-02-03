@@ -355,3 +355,27 @@
   width: 32px;
   height: 32px;
 }
+
+/* ============== MOBILE INPUT ZOOM FIX ============== */
+/* Prevents iOS Safari from zooming when focusing inputs (requires font-size >= 16px) */
+
+@media screen and (max-width: 768px) {
+  .input,
+  .input-select,
+  .input-textarea,
+  input[type="date"],
+  input[type="tel"],
+  input[type="email"],
+  input[type="text"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .time-slot {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
