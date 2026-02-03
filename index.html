@@ -550,8 +550,15 @@
                 <i class="fas fa-check"></i>
             </div>
             <h3 class="modal-title">התור נקבע בהצלחה!</h3>
-            <p class="modal-text">נשלח אלייך אישור במייל. נשמח לראותך!</p>
-            <button class="btn btn-primary" onclick="closeModal()">סגור</button>
+            <div id="modalBookingDetails" class="modal-booking-details"></div>
+            <p class="modal-text">נשמח לראותך!</p>
+            <div class="modal-actions">
+                <a id="modalWhatsApp" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">
+                    <i class="fab fa-whatsapp"></i>
+                    שלחי אישור בוואטסאפ
+                </a>
+                <button class="btn btn-outline btn-modal-close" onclick="closeModal()">סגור</button>
+            </div>
         </div>
     </div>
 

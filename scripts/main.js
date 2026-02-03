@@ -286,7 +286,7 @@ bookingForm.addEventListener('submit', async (e) => {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            showModal();
+            showModal({ ...bookingData, serviceKey: serviceKey });
             bookingForm.reset();
             timeSlotsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>';
         } else {
@@ -360,9 +360,54 @@ contactForm.addEventListener('submit', async (e) => {
     }
 });
 
+// ============== WHATSAPP ==============
+
+const BUSINESS_PHONE = '972515656295';
+
+function generateWhatsAppLink(booking) {
+    const daysHebrew = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+    const dateObj = new Date(booking.date);
+    const dayName = daysHebrew[dateObj.getDay()];
+    const formattedDate = `יום ${dayName}, ${dateObj.toLocaleDateString('he-IL')}`;
+
+    const serviceInfo = CONFIG.SERVICES[booking.serviceKey];
+    const serviceName = serviceInfo ? serviceInfo.name : booking.service;
+
+    const message = `היי! נקבע לי תור אצל לישי סימני 💅
+שירות: ${serviceName}
+תאריך: ${formattedDate}
+שעה: ${booking.time}
+שם: ${booking.name}
+תודה! 💖`;
+
+    return `https://wa.me/${BUSINESS_PHONE}?text=${encodeURIComponent(message)}`;
+}
+
 // ============== MODAL ==============
 
-function showModal() {
+function showModal(booking) {
+    if (booking) {
+        const serviceInfo = CONFIG.SERVICES[booking.serviceKey];
+        const serviceName = serviceInfo ? serviceInfo.name : booking.service;
+
+        const detailsEl = document.getElementById('modalBookingDetails');
+        if (detailsEl) {
+            const dateObj = new Date(booking.date);
+            const daysHebrew = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+            const dayName = daysHebrew[dateObj.getDay()];
+            const formattedDate = `יום ${dayName}, ${dateObj.toLocaleDateString('he-IL')}`;
+
+            detailsEl.innerHTML =
+                `<p><strong>${serviceName}</strong></p>` +
+                `<p>${formattedDate} | ${booking.time}</p>`;
+        }
+
+        const waLink = document.getElementById('modalWhatsApp');
+        if (waLink) {
+            waLink.href = generateWhatsAppLink(booking);
+        }
+    }
+
     successModal.classList.add('active');
     document.body.style.overflow = 'hidden';
 }

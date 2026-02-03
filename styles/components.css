@@ -299,7 +299,52 @@
 
 .modal-text {
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-md);
+}
+
+.modal-booking-details {
+  margin-bottom: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-bg-secondary, #F5EFE3);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-relaxed);
+}
+
+.modal-booking-details:empty {
+  display: none;
+}
+
+.modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium, 500);
+  min-height: 52px;
+  border-radius: var(--radius-full);
+  text-decoration: none;
+}
+
+.btn-whatsapp:hover {
+  background: #1da851;
+  transform: translateY(-2px);
+}
+
+.btn-whatsapp i {
+  font-size: 1.3rem;
+}
+
+.btn-modal-close {
+  font-size: var(--font-size-small);
+  min-height: 40px;
 }
 
 /* ============== LOADING ============== */
