@@ -33,6 +33,13 @@ const UserIdentity = {
         email: 'lishai_user_email',
     },
 
+    // State for OTP flow
+    _pendingPhone: '',
+    _pendingName: '',
+    _pendingEmail: '',
+    _isNewCustomer: false,
+    _resendTimer: null,
+
     get() {
         const name = localStorage.getItem(this.KEYS.name) || '';
         const phone = localStorage.getItem(this.KEYS.phone) || '';
@@ -62,13 +69,12 @@ const UserIdentity = {
         location.reload();
     },
 
-    validate(name, phone, email) {
-        const errors = [];
-        if (!name || name.trim().length < 2) errors.push('נא להזין שם מלא');
-        const phoneClean = (phone || '').replace(/[-\s]/g, '');
-        if (!phoneClean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(phoneClean)) errors.push('נא להזין מספר טלפון תקין');
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('נא להזין כתובת אימייל תקינה');
-        return errors;
+    validatePhone(phone) {
+        const clean = (phone || '').replace(/[-\s]/g, '');
+        if (!clean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(clean)) {
+            return 'נא להזין מספר טלפון תקין';
+        }
+        return null;
     },
 
     showOverlay() {
@@ -86,43 +92,359 @@ const UserIdentity = {
         if (el) el.style.display = '';
     },
 
-    init() {
-        const form = document.getElementById('identityForm');
+    // Step management
+    showStep(step) {
+        document.getElementById('idStep1').style.display = step === 1 ? '' : 'none';
+        document.getElementById('idStep1b').style.display = step === '1b' ? '' : 'none';
+        document.getElementById('idStep2').style.display = step === 2 ? '' : 'none';
+    },
 
+    showError(stepId, msg) {
+        const el = document.getElementById(stepId);
+        if (el) { el.textContent = msg; el.style.display = ''; }
+    },
+
+    hideError(stepId) {
+        const el = document.getElementById(stepId);
+        if (el) el.style.display = 'none';
+    },
+
+    setButtonLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) {
+            btn._origHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח...';
+            btn.disabled = true;
+        } else {
+            btn.innerHTML = btn._origHTML || btn.innerHTML;
+            btn.disabled = false;
+        }
+    },
+
+    // OTP request for existing customer
+    async requestOtpExisting(phone) {
+        const err = this.validatePhone(phone);
+        if (err) { this.showError('idStep1Error', err); return; }
+        this.hideError('idStep1Error');
+
+        const btn = document.getElementById('idSendOtpBtn');
+        this.setButtonLoading(btn, true);
+
+        try {
+            const res = await fetch(CONFIG.API_BASE + '/api/otp/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                this.showError('idStep1Error', data.error || 'שגיאה בשליחת הקוד');
+                return;
+            }
+
+            this._pendingPhone = phone;
+            this._isNewCustomer = false;
+
+            if (data.mock) {
+                document.getElementById('idMockBanner').style.display = 'flex';
+            }
+
+            this.showStep(2);
+            document.getElementById('idOtpPhone').textContent = phone;
+            this._initOtpBoxes();
+            this._startResendTimer();
+
+        } catch (e) {
+            console.error('OTP request error:', e);
+            this.showError('idStep1Error', 'שגיאה בשליחת הקוד. נסי שוב');
+        } finally {
+            this.setButtonLoading(btn, false);
+        }
+    },
+
+    // OTP request for new customer
+    async requestOtpNew(name, phone, email) {
+        const errors = [];
+        if (!name || name.trim().length < 2) errors.push('נא להזין שם מלא');
+        const phoneErr = this.validatePhone(phone);
+        if (phoneErr) errors.push(phoneErr);
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('נא להזין כתובת אימייל תקינה');
+
+        if (errors.length > 0) {
+            this.showError('idStep1bError', errors.join('. '));
+            return;
+        }
+        this.hideError('idStep1bError');
+
+        const btn = document.getElementById('idRegSendOtpBtn');
+        this.setButtonLoading(btn, true);
+
+        try {
+            const res = await fetch(CONFIG.API_BASE + '/api/otp/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: phone })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                this.showError('idStep1bError', data.error || 'שגיאה בשליחת הקוד');
+                return;
+            }
+
+            this._pendingPhone = phone;
+            this._pendingName = name;
+            this._pendingEmail = email;
+            this._isNewCustomer = true;
+
+            if (data.mock) {
+                document.getElementById('idMockBanner').style.display = 'flex';
+            }
+
+            this.showStep(2);
+            document.getElementById('idOtpPhone').textContent = phone;
+            this._initOtpBoxes();
+            this._startResendTimer();
+
+        } catch (e) {
+            console.error('OTP request error:', e);
+            this.showError('idStep1bError', 'שגיאה בשליחת הקוד. נסי שוב');
+        } finally {
+            this.setButtonLoading(btn, false);
+        }
+    },
+
+    // Verify OTP
+    async verifyOtp(code) {
+        this.hideError('idStep2Error');
+        const btn = document.getElementById('idVerifyBtn');
+        this.setButtonLoading(btn, true);
+
+        try {
+            const res = await fetch(CONFIG.API_BASE + '/api/otp/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: this._pendingPhone, code: code })
+            });
+            const data = await res.json();
+
+            if (!data.verified) {
+                this.showError('idStep2Error', data.error || 'קוד שגוי');
+                // Clear OTP boxes
+                document.querySelectorAll('.otp-box').forEach(function(b) { b.value = ''; });
+                document.querySelector('.otp-box').focus();
+                btn.disabled = true;
+                return;
+            }
+
+            // OTP verified! Now get user details
+            if (this._isNewCustomer) {
+                // New customer — use the registration data
+                this.save(this._pendingName, this._pendingPhone, this._pendingEmail);
+            } else {
+                // Existing customer — lookup from Calendar
+                try {
+                    const lookupRes = await fetch(
+                        CONFIG.API_BASE + '/api/user/lookup?phone=' + encodeURIComponent(this._pendingPhone)
+                    );
+                    const lookupData = await lookupRes.json();
+
+                    if (lookupData.found && lookupData.name && lookupData.email) {
+                        this.save(lookupData.name, this._pendingPhone, lookupData.email);
+                    } else {
+                        // Not found in Calendar — switch to registration
+                        this._isNewCustomer = true;
+                        document.getElementById('idRegPhone').value = this._pendingPhone;
+                        this.showStep('1b');
+                        this.showError('idStep1bError', 'לא מצאנו תורים קודמים. מלאי את הפרטים שלך');
+                        return;
+                    }
+                } catch (e) {
+                    console.error('User lookup error:', e);
+                    // Fallback to registration
+                    document.getElementById('idRegPhone').value = this._pendingPhone;
+                    this.showStep('1b');
+                    return;
+                }
+            }
+
+            // Done — hide overlay
+            this.hideOverlay();
+            this.showResetBtn();
+            if (this._resendTimer) clearInterval(this._resendTimer);
+
+            // Trigger My Appointments auto-lookup
+            MyAppointments.lookupPhone(this._pendingPhone);
+
+        } catch (e) {
+            console.error('OTP verify error:', e);
+            this.showError('idStep2Error', 'שגיאה באימות. נסי שוב');
+        } finally {
+            this.setButtonLoading(btn, false);
+        }
+    },
+
+    // Resend OTP
+    async resendOtp() {
+        try {
+            const res = await fetch(CONFIG.API_BASE + '/api/otp/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: this._pendingPhone })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                this.showError('idStep2Error', data.error || 'שגיאה בשליחה חוזרת');
+                return;
+            }
+
+            this.hideError('idStep2Error');
+            document.querySelectorAll('.otp-box').forEach(function(b) { b.value = ''; });
+            document.querySelector('.otp-box').focus();
+            this._startResendTimer();
+        } catch (e) {
+            this.showError('idStep2Error', 'שגיאה בשליחה חוזרת');
+        }
+    },
+
+    // OTP box behavior
+    _initOtpBoxes() {
+        const boxes = document.querySelectorAll('.otp-box');
+        const self = this;
+
+        boxes.forEach(function(box, i) {
+            box.value = '';
+            box.classList.remove('filled');
+
+            box.addEventListener('input', function() {
+                const val = this.value.replace(/\D/g, '');
+                this.value = val.slice(0, 1);
+
+                if (val && i < boxes.length - 1) {
+                    boxes[i + 1].focus();
+                }
+
+                this.classList.toggle('filled', !!val);
+
+                // Check if all filled
+                let code = '';
+                boxes.forEach(function(b) { code += b.value; });
+                document.getElementById('idVerifyBtn').disabled = code.length < 6;
+
+                // Auto-submit when complete
+                if (code.length === 6) {
+                    self.verifyOtp(code);
+                }
+            });
+
+            box.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !this.value && i > 0) {
+                    boxes[i - 1].focus();
+                    boxes[i - 1].value = '';
+                    boxes[i - 1].classList.remove('filled');
+                }
+            });
+
+            box.addEventListener('paste', function(e) {
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                for (let j = 0; j < Math.min(pasted.length, boxes.length); j++) {
+                    boxes[j].value = pasted[j];
+                    boxes[j].classList.add('filled');
+                }
+                const focusIdx = Math.min(pasted.length, boxes.length - 1);
+                boxes[focusIdx].focus();
+
+                if (pasted.length >= 6) {
+                    document.getElementById('idVerifyBtn').disabled = false;
+                    self.verifyOtp(pasted.slice(0, 6));
+                }
+            });
+        });
+
+        boxes[0].focus();
+    },
+
+    _startResendTimer() {
+        const timerEl = document.getElementById('otpResendTimer');
+        const resendBtn = document.getElementById('otpResendBtn');
+        const countdownEl = document.getElementById('otpCountdown');
+        let seconds = 60;
+
+        timerEl.style.display = '';
+        resendBtn.style.display = 'none';
+        countdownEl.textContent = seconds;
+
+        if (this._resendTimer) clearInterval(this._resendTimer);
+
+        const self = this;
+        this._resendTimer = setInterval(function() {
+            seconds--;
+            countdownEl.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(self._resendTimer);
+                timerEl.style.display = 'none';
+                resendBtn.style.display = '';
+            }
+        }, 1000);
+    },
+
+    init() {
         if (this.exists()) {
             this.hideOverlay();
             this.showResetBtn();
-        } else {
-            this.showOverlay();
+            return;
         }
 
-        if (form) {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const name = document.getElementById('idName').value;
-                const phone = document.getElementById('idPhone').value;
-                const email = document.getElementById('idEmail').value;
+        this.showOverlay();
+        this.showStep(1);
 
-                const errors = this.validate(name, phone, email);
-                const errEl = document.getElementById('identityError');
+        const self = this;
 
-                if (errors.length > 0) {
-                    if (errEl) {
-                        errEl.textContent = errors.join('. ');
-                        errEl.style.display = '';
-                    }
-                    return;
-                }
+        // Step 1: Existing customer — phone form
+        document.getElementById('idPhoneForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            self.requestOtpExisting(document.getElementById('idPhone').value);
+        });
 
-                if (errEl) errEl.style.display = 'none';
-                this.save(name, phone, email);
-                this.hideOverlay();
-                this.showResetBtn();
+        // Step 1b: New customer — registration form
+        document.getElementById('idRegisterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            self.requestOtpNew(
+                document.getElementById('idRegName').value,
+                document.getElementById('idRegPhone').value,
+                document.getElementById('idRegEmail').value
+            );
+        });
 
-                // Trigger My Appointments auto-lookup
-                MyAppointments.lookupPhone(phone);
-            });
-        }
+        // Toggle between existing/new customer
+        document.getElementById('idNewCustomerLink').addEventListener('click', function() {
+            self.showStep('1b');
+        });
+        document.getElementById('idExistingCustomerLink').addEventListener('click', function() {
+            self.showStep(1);
+        });
+
+        // Back from OTP
+        document.getElementById('idBackToPhone').addEventListener('click', function() {
+            if (self._resendTimer) clearInterval(self._resendTimer);
+            self.showStep(self._isNewCustomer ? '1b' : 1);
+            document.getElementById('idMockBanner').style.display = 'none';
+        });
+
+        // Verify button
+        document.getElementById('idVerifyBtn').addEventListener('click', function() {
+            let code = '';
+            document.querySelectorAll('.otp-box').forEach(function(b) { code += b.value; });
+            if (code.length === 6) self.verifyOtp(code);
+        });
+
+        // Resend
+        document.getElementById('otpResendBtn').addEventListener('click', function() {
+            self.resendOtp();
+        });
     }
 };
 

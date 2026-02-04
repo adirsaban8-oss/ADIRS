@@ -39,6 +39,9 @@ from email_service import (
 # Import WhatsApp service
 from whatsapp_service import send_whatsapp_booking_confirmation
 
+# Import WhatsApp OTP service
+from whatsapp_otp import request_otp, verify_otp
+
 app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(32).hex())
 
@@ -623,6 +626,106 @@ def my_appointments():
         "appointments": appointments,
         "count": len(appointments)
     })
+
+
+# ============== OTP AUTHENTICATION ==============
+
+@app.route('/api/otp/request', methods=['POST'])
+def otp_request():
+    """Send OTP to a phone number via WhatsApp (or mock)."""
+    data = request.json or {}
+    phone = data.get('phone', '').strip()
+
+    if not phone:
+        return jsonify({"error": "מספר טלפון חסר"}), 400
+
+    result = request_otp(phone)
+
+    if not result['success']:
+        return jsonify({"error": result['error']}), 429 if 'ניסיונות' in result.get('error', '') else 400
+
+    return jsonify({
+        "success": True,
+        "mock": result.get('mock', False),
+    })
+
+
+@app.route('/api/otp/verify', methods=['POST'])
+def otp_verify():
+    """Verify an OTP code."""
+    data = request.json or {}
+    phone = data.get('phone', '').strip()
+    code = data.get('code', '').strip()
+
+    if not phone or not code:
+        return jsonify({"error": "חסרים פרטים"}), 400
+
+    result = verify_otp(phone, code)
+
+    if not result['verified']:
+        return jsonify({"verified": False, "error": result['error']}), 400
+
+    return jsonify({"verified": True})
+
+
+@app.route('/api/user/lookup', methods=['GET'])
+def user_lookup():
+    """Look up user details from Google Calendar by phone number.
+    Returns name and email if found in past/future bookings."""
+    phone = request.args.get('phone', '').strip()
+
+    if not phone:
+        return jsonify({"found": False}), 400
+
+    phone_norm = normalize_phone(phone)
+
+    try:
+        service = get_calendar_service()
+        now = datetime.now(ISRAEL_TZ)
+
+        # Search past 180 days + future 60 days
+        time_min = (now - timedelta(days=180)).isoformat()
+        time_max = (now + timedelta(days=60)).isoformat()
+
+        events_result = service.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy='startTime',
+            maxResults=50
+        ).execute()
+
+        events = events_result.get('items', [])
+
+        for event in events:
+            description = event.get('description', '')
+            if not description:
+                continue
+
+            lines = [line.strip() for line in description.strip().split('\n') if line.strip()]
+            if len(lines) < 4:
+                continue
+
+            event_phone = normalize_phone(lines[2]) if len(lines) >= 3 else ''
+            if event_phone != phone_norm:
+                continue
+
+            # Found a match — extract name and email
+            name = lines[1] if len(lines) >= 2 else ''
+            email = lines[3] if len(lines) >= 4 else ''
+
+            return jsonify({
+                "found": True,
+                "name": name,
+                "email": email,
+            })
+
+        return jsonify({"found": False})
+
+    except Exception as e:
+        print(f"User lookup error: {str(e)}")
+        return jsonify({"found": False})
 
 
 # ============== ADMIN PANEL ==============

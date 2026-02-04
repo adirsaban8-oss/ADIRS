@@ -37,27 +37,88 @@
     <div id="identityOverlay" class="identity-overlay" style="display: none;">
         <div class="identity-card">
             <div class="identity-logo">LISHAI SIMANI</div>
-            <h2 class="identity-title">ברוכה הבאה</h2>
-            <p class="identity-subtitle">הפרטים משמשים לזיהוי התור שלך בלבד</p>
-            <form id="identityForm" class="identity-form">
-                <div class="input-group">
-                    <label class="input-label">שם מלא</label>
-                    <input type="text" class="input" id="idName" placeholder="הכניסי את שמך" required>
+
+            <!-- Step 1: Phone Entry -->
+            <div id="idStep1" class="id-step">
+                <h2 class="identity-title">ברוכה הבאה</h2>
+                <p class="identity-subtitle">הכניסי מספר טלפון לזיהוי</p>
+                <form id="idPhoneForm" class="identity-form">
+                    <div class="input-group">
+                        <label class="input-label">טלפון</label>
+                        <input type="tel" class="input" id="idPhone" placeholder="050-0000000" dir="ltr" required>
+                    </div>
+                    <div id="idStep1Error" class="apt-inline-message apt-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full-width btn-lg" id="idSendOtpBtn">
+                        <i class="fas fa-paper-plane"></i>
+                        שלחי קוד אימות
+                    </button>
+                </form>
+                <p class="identity-footer-text">
+                    חדשה כאן? <span id="idNewCustomerLink" class="identity-link">לחצי להצטרפות</span>
+                </p>
+            </div>
+
+            <!-- Step 1b: New Customer Registration -->
+            <div id="idStep1b" class="id-step" style="display: none;">
+                <h2 class="identity-title">הצטרפות</h2>
+                <p class="identity-subtitle">מלאי את הפרטים שלך</p>
+                <form id="idRegisterForm" class="identity-form">
+                    <div class="input-group">
+                        <label class="input-label">שם מלא</label>
+                        <input type="text" class="input" id="idRegName" placeholder="הכניסי את שמך" required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">טלפון</label>
+                        <input type="tel" class="input" id="idRegPhone" placeholder="050-0000000" dir="ltr" required>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">אימייל</label>
+                        <input type="email" class="input" id="idRegEmail" placeholder="your@email.com" dir="ltr" required>
+                    </div>
+                    <div id="idStep1bError" class="apt-inline-message apt-error" style="display: none;"></div>
+                    <button type="submit" class="btn btn-primary btn-full-width btn-lg" id="idRegSendOtpBtn">
+                        <i class="fas fa-paper-plane"></i>
+                        שלחי קוד אימות
+                    </button>
+                </form>
+                <p class="identity-footer-text">
+                    כבר מוכרת? <span id="idExistingCustomerLink" class="identity-link">לחצי לכניסה</span>
+                </p>
+            </div>
+
+            <!-- Step 2: OTP Verification -->
+            <div id="idStep2" class="id-step" style="display: none;">
+                <h2 class="identity-title">קוד אימות</h2>
+                <p class="identity-subtitle">הקוד נשלח ל-<span id="idOtpPhone" dir="ltr"></span></p>
+                <div class="otp-container">
+                    <div class="otp-boxes" id="otpBoxes">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="0">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="1">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="2">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="3">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="4">
+                        <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]" data-index="5">
+                    </div>
+                    <div id="idStep2Error" class="apt-inline-message apt-error" style="display: none;"></div>
+                    <button id="idVerifyBtn" class="btn btn-primary btn-full-width btn-lg" disabled>
+                        <i class="fas fa-check"></i>
+                        אמתי קוד
+                    </button>
+                    <p class="otp-resend" id="otpResend">
+                        <span id="otpResendTimer">ניתן לשלוח שוב בעוד <strong id="otpCountdown">60</strong> שניות</span>
+                        <span id="otpResendBtn" class="identity-link" style="display: none;">שלחי קוד חדש</span>
+                    </p>
+                    <p class="identity-footer-text">
+                        <span id="idBackToPhone" class="identity-link"><i class="fas fa-arrow-right"></i> חזרה</span>
+                    </p>
                 </div>
-                <div class="input-group">
-                    <label class="input-label">טלפון</label>
-                    <input type="tel" class="input" id="idPhone" placeholder="050-0000000" dir="ltr" required>
-                </div>
-                <div class="input-group">
-                    <label class="input-label">אימייל</label>
-                    <input type="email" class="input" id="idEmail" placeholder="your@email.com" dir="ltr" required>
-                </div>
-                <div id="identityError" class="apt-inline-message apt-error" style="display: none;"></div>
-                <button type="submit" class="btn btn-primary btn-full-width btn-lg">
-                    <i class="fas fa-arrow-left"></i>
-                    המשיכי לאתר
-                </button>
-            </form>
+            </div>
+
+            <!-- Mock Mode Banner (dev only) -->
+            <div id="idMockBanner" class="otp-mock-banner" style="display: none;">
+                <i class="fas fa-info-circle"></i>
+                <span>מצב פיתוח — הקוד מופיע בלוגים בלבד</span>
+            </div>
         </div>
     </div>
 
