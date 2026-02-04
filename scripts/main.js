@@ -402,10 +402,7 @@ function showModal(booking) {
                 `<p>${formattedDate} | ${booking.time}</p>`;
         }
 
-        const waLink = document.getElementById('modalWhatsApp');
-        if (waLink) {
-            waLink.href = generateWhatsAppLink(booking);
-        }
+        // WhatsApp confirmation is sent automatically from the backend
     }
 
     successModal.classList.add('active');
