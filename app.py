@@ -433,15 +433,21 @@ def book_appointment():
             print(f"Failed to send confirmation email: {str(email_error)}")
 
         # Send WhatsApp confirmation in background (non-blocking)
-        try:
-            wa_thread = threading.Thread(
-                target=send_whatsapp_booking_confirmation,
-                args=(booking_data,),
-                daemon=True
-            )
-            wa_thread.start()
-        except Exception as wa_error:
-            print(f"Failed to start WhatsApp thread: {str(wa_error)}")
+        wa_enabled = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
+        print(f"[WhatsApp] enabled={wa_enabled}, phone={booking_data.get('phone')}")
+        if wa_enabled:
+            try:
+                print(f"[WhatsApp] Sending booking confirmation to {booking_data.get('name')}...")
+                wa_thread = threading.Thread(
+                    target=send_whatsapp_booking_confirmation,
+                    args=(booking_data,),
+                    daemon=True
+                )
+                wa_thread.start()
+            except Exception as wa_error:
+                print(f"[WhatsApp] Failed to start thread: {str(wa_error)}")
+        else:
+            print("[WhatsApp] Skipping - WHATSAPP_ENABLED is not true")
 
         return jsonify({
             "success": True,
