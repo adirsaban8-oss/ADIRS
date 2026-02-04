@@ -1,5 +1,5 @@
 """
-WhatsApp Cloud API Service - LISHAY SIMANI Beauty Studio
+WhatsApp Cloud API Service - LISHAI SIMANI Beauty Studio
 Sends automatic booking confirmations via Meta WhatsApp Cloud API.
 """
 

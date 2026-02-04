@@ -1,5 +1,5 @@
 """
-Google Calendar Service Module for LISHAY Booking System
+Google Calendar Service Module for LISHAI Booking System
 Handles all interactions with Google Calendar API
 """
 

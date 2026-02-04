@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <meta name="description" content="LISHAY SIMANI - מניקוריסטית מקצועית בקרני שומרון. טיפולי ציפורניים יוקרתיים, בנייה, ג'ל, גבות ועוד. הזמיני תור עכשיו!">
+    <meta name="description" content="LISHAI SIMANI - מניקוריסטית מקצועית בקרני שומרון. טיפולי ציפורניים יוקרתיים, בנייה, ג'ל, גבות ועוד. הזמיני תור עכשיו!">
     <meta name="keywords" content="מניקור, פדיקור, ציפורניים, בנייה, ג'ל, גבות, קרני שומרון, לישי סימני">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="theme-color" content="#C4A35A">
-    <title>LISHAY SIMANI | מניקוריסטית מקצועית</title>
+    <title>LISHAI SIMANI | מניקוריסטית מקצועית</title>
 
     <!-- Preconnect for performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -36,7 +36,7 @@
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
         <div class="container">
-            <a href="#home" class="nav-logo">LISHAY SIMANI</a>
+            <a href="#home" class="nav-logo">LISHAI SIMANI</a>
 
             <button class="nav-toggle" id="navToggle" aria-label="תפריט">
                 <span></span>
@@ -61,7 +61,7 @@
         <div class="hero-content">
             <div class="hero-badge">✦ LUXURY NAIL ART ✦</div>
             <h1 class="hero-title">
-                <span>LISHAY</span>
+                <span>LISHAI</span>
                 <span class="gold">SIMANI</span>
             </h1>
             <p class="hero-subtitle">מניקוריסטית מקצועית</p>
@@ -318,50 +318,53 @@
                 <p class="section-subtitle">העבודות שלי - כל עבודה היא יצירת אמנות</p>
             </div>
 
-            <div class="gallery-grid">
+            <div class="gallery-grid" id="galleryGrid">
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery1.jpeg" alt="עיצוב ציפורניים שחור מרבל" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>עיצוב מושלם</span>
-                    </div>
+                    <div class="gallery-overlay"><span>עיצוב מושלם</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery2.jpeg" alt="עיצוב ציפורניים צבעוני" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>דיוק מושלם</span>
-                    </div>
+                    <div class="gallery-overlay"><span>דיוק מושלם</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery3.jpeg" alt="עיצוב ציפורניים נוד" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>עיצוב ייחודי</span>
-                    </div>
+                    <div class="gallery-overlay"><span>עיצוב ייחודי</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery4.jpeg" alt="פרנץ מניקור עם דובדבנים" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>מראה מרהיב</span>
-                    </div>
+                    <div class="gallery-overlay"><span>מראה מרהיב</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery5.jpeg" alt="עיצוב ציפורניים אדום" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>פינוק מלכותי</span>
-                    </div>
+                    <div class="gallery-overlay"><span>פינוק מלכותי</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery6.jpeg" alt="עיצוב ציפורניים ורוד וטורקיז" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>יוקרה ואלגנטיות</span>
-                    </div>
+                    <div class="gallery-overlay"><span>יוקרה ואלגנטיות</span></div>
                 </div>
                 <div class="gallery-item fade-in">
                     <img src="static/images/gallery7.jpeg" alt="פרנץ מניקור עם נקודות" loading="lazy">
-                    <div class="gallery-overlay">
-                        <span>תוצאה מושלמת</span>
-                    </div>
+                    <div class="gallery-overlay"><span>תוצאה מושלמת</span></div>
                 </div>
             </div>
+            <script>
+            (function() {
+                fetch('/api/gallery-images').then(function(r) { return r.json(); }).then(function(data) {
+                    if (data.images && data.images.length > 0) {
+                        var grid = document.getElementById('galleryGrid');
+                        var texts = ['עיצוב מושלם','דיוק מושלם','עיצוב ייחודי','מראה מרהיב','פינוק מלכותי','יוקרה ואלגנטיות','תוצאה מושלמת'];
+                        grid.innerHTML = '';
+                        data.images.forEach(function(img, i) {
+                            var item = document.createElement('div');
+                            item.className = 'gallery-item fade-in visible';
+                            item.innerHTML = '<img src="static/images/' + img + '" alt="עיצוב ציפורניים" loading="lazy"><div class="gallery-overlay"><span>' + texts[i % texts.length] + '</span></div>';
+                            grid.appendChild(item);
+                        });
+                    }
+                }).catch(function() {});
+            })();
+            </script>
 
             <p class="gallery-note">
                 <i class="fas fa-camera"></i>
@@ -467,7 +470,7 @@
                     <div class="about-image-frame">
                         <div class="about-image-placeholder">
                             <i class="fas fa-spa"></i>
-                            <span>LISHAY SIMANI</span>
+                            <span>LISHAI SIMANI</span>
                         </div>
                     </div>
                 </div>
@@ -512,7 +515,7 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-brand">
-                    <h3>LISHAY SIMANI</h3>
+                    <h3>LISHAI SIMANI</h3>
                     <p>מניקוריסטית מקצועית</p>
                     <p>יוקרה, מקצועיות ודיוק</p>
                 </div>
@@ -538,7 +541,7 @@
             </div>
 
             <div class="footer-bottom">
-                <p>© 2024 LISHAY SIMANI. כל הזכויות שמורות.</p>
+                <p>© 2024 LISHAI SIMANI. כל הזכויות שמורות.</p>
             </div>
         </div>
     </footer>

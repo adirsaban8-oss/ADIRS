@@ -1,5 +1,5 @@
 /* ============================================
-   MAIN JAVASCRIPT - LISHAY SIMANI BEAUTY STUDIO
+   MAIN JAVASCRIPT - LISHAI SIMANI BEAUTY STUDIO
    Connected to Flask API for Railway Deployment
    ============================================ */
 
@@ -470,7 +470,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // ============== INITIALIZE ==============
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('LISHAY SIMANI Beauty Studio - Website Loaded');
+    console.log('LISHAI SIMANI Beauty Studio - Website Loaded');
 
     // Add visible class to hero elements
     document.querySelectorAll('.hero .fade-in').forEach(el => {

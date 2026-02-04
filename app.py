@@ -1,12 +1,15 @@
 """
-LISHAY SIMANI Beauty Studio - Flask Server for Railway
+LISHAI SIMANI Beauty Studio - Flask Server for Railway
 Serves the static HTML/CSS/JS website and provides booking API
 """
 
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect
 from datetime import datetime, timedelta, date
+from functools import wraps
 import os
+import json
 import threading
+from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
@@ -37,6 +40,81 @@ from email_service import (
 from whatsapp_service import send_whatsapp_booking_confirmation
 
 app = Flask(__name__, static_folder='.', static_url_path='')
+app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(32).hex())
+
+# ============== ADMIN CONFIGURATION ==============
+
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'admin123')
+BLOCKED_SLOTS_FILE = os.path.join(os.path.dirname(__file__), 'data', 'blocked_slots.json')
+GALLERY_DATA_FILE = os.path.join(os.path.dirname(__file__), 'data', 'gallery.json')
+GALLERY_UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'static', 'images')
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'webp'}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+
+# Ensure data directory exists
+os.makedirs(os.path.join(os.path.dirname(__file__), 'data'), exist_ok=True)
+os.makedirs(GALLERY_UPLOAD_DIR, exist_ok=True)
+
+
+def load_blocked_slots():
+    """Load blocked slots from JSON file."""
+    try:
+        if os.path.exists(BLOCKED_SLOTS_FILE):
+            with open(BLOCKED_SLOTS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading blocked slots: {e}")
+    return {}
+
+
+def save_blocked_slots(data):
+    """Save blocked slots to JSON file."""
+    try:
+        with open(BLOCKED_SLOTS_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving blocked slots: {e}")
+
+
+def load_gallery_data():
+    """Load gallery image order from JSON file."""
+    try:
+        if os.path.exists(GALLERY_DATA_FILE):
+            with open(GALLERY_DATA_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading gallery data: {e}")
+    # Default: scan existing gallery images
+    images = []
+    if os.path.exists(GALLERY_UPLOAD_DIR):
+        for f in sorted(os.listdir(GALLERY_UPLOAD_DIR)):
+            if f.lower().startswith('gallery') and any(f.lower().endswith(ext) for ext in ['jpg', 'jpeg', 'png', 'webp']):
+                images.append(f)
+    return {"images": images}
+
+
+def save_gallery_data(data):
+    """Save gallery data to JSON file."""
+    try:
+        with open(GALLERY_DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except Exception as e:
+        print(f"Error saving gallery data: {e}")
+
+
+def allowed_file(filename):
+    """Check if file extension is allowed."""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def admin_required(f):
+    """Decorator to require admin authentication."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('admin_authenticated'):
+            return jsonify({"error": "Unauthorized"}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ============== REMINDER SCHEDULER ==============
 
@@ -276,6 +354,12 @@ def get_available_slots():
             print(f"Calendar error (returning all slots): {str(cal_error)}")
             available_slots = all_slots  # Graceful fallback
 
+        # Filter out admin-blocked slots
+        blocked = load_blocked_slots()
+        blocked_times = blocked.get(date_str, [])
+        if blocked_times:
+            available_slots = [s for s in available_slots if s not in blocked_times]
+
         return jsonify({"slots": available_slots})
 
     except ValueError:
@@ -394,6 +478,175 @@ def contact():
         "success": True,
         "message": "ההודעה נשלחה בהצלחה! אחזור אלייך בהקדם."
     })
+
+
+# ============== ADMIN PANEL ==============
+
+@app.route('/admin')
+def admin_page():
+    """Serve the admin panel page."""
+    return send_from_directory('.', 'admin.html')
+
+
+@app.route('/api/admin/login', methods=['POST'])
+def admin_login():
+    """Authenticate admin user."""
+    data = request.json
+    if not data or not data.get('password'):
+        return jsonify({"error": "Password required"}), 400
+
+    if data['password'] == ADMIN_PASSWORD:
+        session['admin_authenticated'] = True
+        return jsonify({"success": True})
+    else:
+        return jsonify({"error": "סיסמה שגויה"}), 401
+
+
+@app.route('/api/admin/logout', methods=['POST'])
+def admin_logout():
+    """Logout admin user."""
+    session.pop('admin_authenticated', None)
+    return jsonify({"success": True})
+
+
+@app.route('/api/admin/blocked-slots', methods=['GET'])
+@admin_required
+def get_blocked_slots():
+    """Get all blocked time slots."""
+    return jsonify(load_blocked_slots())
+
+
+@app.route('/api/admin/blocked-slots', methods=['POST'])
+@admin_required
+def update_blocked_slots():
+    """Update blocked time slots for a specific date."""
+    data = request.json
+    if not data or 'date' not in data:
+        return jsonify({"error": "Date required"}), 400
+
+    date_str = data['date']
+    slots = data.get('slots', [])
+
+    blocked = load_blocked_slots()
+
+    if slots:
+        blocked[date_str] = slots
+    else:
+        blocked.pop(date_str, None)
+
+    save_blocked_slots(blocked)
+    return jsonify({"success": True, "blocked": blocked})
+
+
+@app.route('/api/admin/blocked-slots/clear', methods=['POST'])
+@admin_required
+def clear_blocked_date():
+    """Clear all blocked slots for a specific date."""
+    data = request.json
+    if not data or 'date' not in data:
+        return jsonify({"error": "Date required"}), 400
+
+    blocked = load_blocked_slots()
+    blocked.pop(data['date'], None)
+    save_blocked_slots(blocked)
+    return jsonify({"success": True})
+
+
+@app.route('/api/admin/gallery', methods=['GET'])
+@admin_required
+def get_gallery():
+    """Get gallery images list."""
+    gallery = load_gallery_data()
+    return jsonify(gallery)
+
+
+@app.route('/api/admin/gallery/upload', methods=['POST'])
+@admin_required
+def upload_gallery_image():
+    """Upload a new gallery image."""
+    if 'image' not in request.files:
+        return jsonify({"error": "No image file provided"}), 400
+
+    file = request.files['image']
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({"error": "File type not allowed. Use JPG, PNG, or WebP"}), 400
+
+    # Check file size
+    file.seek(0, 2)
+    size = file.tell()
+    file.seek(0)
+    if size > MAX_FILE_SIZE:
+        return jsonify({"error": "File too large. Max 5MB"}), 400
+
+    # Generate unique filename
+    ext = file.filename.rsplit('.', 1)[1].lower()
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f"gallery_{timestamp}.{ext}"
+    filepath = os.path.join(GALLERY_UPLOAD_DIR, filename)
+
+    file.save(filepath)
+
+    # Add to gallery data
+    gallery = load_gallery_data()
+    gallery['images'].append(filename)
+    save_gallery_data(gallery)
+
+    return jsonify({"success": True, "filename": filename})
+
+
+@app.route('/api/admin/gallery/delete', methods=['POST'])
+@admin_required
+def delete_gallery_image():
+    """Delete a gallery image."""
+    data = request.json
+    if not data or 'filename' not in data:
+        return jsonify({"error": "Filename required"}), 400
+
+    filename = secure_filename(data['filename'])
+    filepath = os.path.join(GALLERY_UPLOAD_DIR, filename)
+
+    # Remove file
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    # Update gallery data
+    gallery = load_gallery_data()
+    if filename in gallery['images']:
+        gallery['images'].remove(filename)
+        save_gallery_data(gallery)
+
+    return jsonify({"success": True})
+
+
+@app.route('/api/admin/gallery/reorder', methods=['POST'])
+@admin_required
+def reorder_gallery():
+    """Reorder gallery images."""
+    data = request.json
+    if not data or 'images' not in data:
+        return jsonify({"error": "Images list required"}), 400
+
+    gallery = load_gallery_data()
+    gallery['images'] = data['images']
+    save_gallery_data(gallery)
+
+    return jsonify({"success": True})
+
+
+@app.route('/api/gallery-images', methods=['GET'])
+def get_public_gallery():
+    """Public endpoint to get gallery images for the main site."""
+    gallery = load_gallery_data()
+    return jsonify(gallery)
+
+
+@app.route('/robots.txt')
+def robots():
+    """Serve robots.txt - exclude admin routes."""
+    return "User-agent: *\nDisallow: /admin\nDisallow: /api/admin/\n", 200, {'Content-Type': 'text/plain'}
 
 
 # ============== ERROR HANDLERS ==============

@@ -1,5 +1,5 @@
 /* ============================================
-   MAIN STYLES - LISHAY SIMANI BEAUTY STUDIO
+   MAIN STYLES - LISHAI SIMANI BEAUTY STUDIO
    LUXURY GOLD EDITION
    ============================================ */
 
@@ -1052,14 +1052,421 @@ body {
     align-items: center;
   }
 
-  .services-grid,
-  .policies-grid,
-  .gallery-grid {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+  }
+
+  .policies-grid {
     grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 
   .about-features {
     grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ============== MOBILE OPTIMIZATION (iPhone 375-430px) ============== */
+
+@media (max-width: 480px) {
+
+  /* --- Global mobile spacing --- */
+  .section {
+    padding: clamp(2rem, 6vw, 3.5rem) 0;
+  }
+
+  .section-header {
+    margin-bottom: var(--space-lg);
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+  }
+
+  .section-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .container {
+    padding: 0 1rem;
+  }
+
+  /* --- Hero mobile --- */
+  .hero {
+    min-height: 85vh;
+    padding: var(--space-2xl) var(--space-sm);
+  }
+
+  .hero-badge {
+    font-size: 0.625rem;
+    padding: var(--space-xs) var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .hero-title {
+    font-size: clamp(2.2rem, 12vw, 3.5rem);
+    margin-bottom: var(--space-md);
+  }
+
+  .hero-subtitle {
+    font-size: 1.1rem;
+  }
+
+  .hero-tagline {
+    font-size: 0.85rem;
+    margin-bottom: var(--space-lg);
+  }
+
+  .hero-buttons {
+    gap: var(--space-sm);
+  }
+
+  .hero-buttons .btn {
+    padding: var(--space-sm) var(--space-lg);
+    font-size: 0.85rem;
+    min-height: 44px;
+  }
+
+  /* --- Services mobile: compact 2-col grid --- */
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .service-card {
+    padding: var(--space-md) var(--space-sm);
+    border-radius: var(--radius-lg);
+  }
+
+  .service-card-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+    margin: 0 auto var(--space-sm);
+  }
+
+  .service-card-name {
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+  }
+
+  .service-card-name-en {
+    font-size: 0.65rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .service-card-price {
+    font-size: 1.15rem;
+    margin-bottom: 4px;
+  }
+
+  .service-card-duration {
+    font-size: 0.7rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .service-card-btn {
+    padding: 6px var(--space-sm);
+    font-size: 0.7rem;
+  }
+
+  /* --- Policies mobile: compact --- */
+  .policies-grid {
+    gap: var(--space-sm);
+  }
+
+  .policy-card {
+    padding: var(--space-md);
+    border-radius: var(--radius-lg);
+  }
+
+  .policy-card-icon {
+    font-size: 1.75rem;
+    margin-bottom: var(--space-xs);
+  }
+
+  .policy-card-title {
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+
+  .policy-card-text {
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  /* --- Booking mobile: compact form --- */
+  .booking-container {
+    gap: var(--space-lg);
+  }
+
+  .booking-info {
+    gap: var(--space-sm);
+  }
+
+  .info-card {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .info-card-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .info-card-content h4 {
+    font-size: 0.85rem;
+  }
+
+  .info-card-content p {
+    font-size: 0.8rem;
+  }
+
+  .booking-form-wrapper {
+    padding: var(--space-lg);
+  }
+
+  .input-group {
+    margin-bottom: var(--space-md);
+  }
+
+  .input-label {
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+  }
+
+  .input {
+    padding: var(--space-sm);
+    font-size: 16px; /* prevent iOS zoom */
+  }
+
+  .input-textarea {
+    min-height: 80px;
+  }
+
+  .time-slots {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 6px;
+  }
+
+  .time-slot {
+    padding: var(--space-xs);
+    font-size: 0.8rem;
+    min-height: 44px;
+  }
+
+  .booking .btn-full-width {
+    min-height: 48px;
+    font-size: 0.9rem;
+  }
+
+  /* --- Gallery mobile: 2-col compact grid --- */
+  .gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .gallery-item {
+    border-radius: var(--radius-md);
+    aspect-ratio: 1 / 1;
+  }
+
+  .gallery-item img {
+    object-fit: cover;
+  }
+
+  .gallery-overlay {
+    padding: var(--space-xs);
+  }
+
+  .gallery-overlay span {
+    font-size: 0.75rem;
+  }
+
+  .gallery-note {
+    font-size: 0.75rem;
+    margin-top: var(--space-md);
+  }
+
+  /* --- Contact mobile --- */
+  .contact-container {
+    gap: var(--space-lg);
+  }
+
+  .contact-info h3 {
+    font-size: 1.25rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .contact-item {
+    margin-bottom: var(--space-sm);
+    gap: var(--space-sm);
+  }
+
+  .contact-item-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .contact-item-content h4 {
+    font-size: 0.85rem;
+  }
+
+  .contact-item-content p {
+    font-size: 0.8rem;
+  }
+
+  .social-links {
+    margin-top: var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .social-link {
+    width: 44px;
+    height: 44px;
+    font-size: 1.1rem;
+  }
+
+  .contact-form-wrapper {
+    padding: var(--space-lg);
+  }
+
+  /* --- About mobile --- */
+  .about-content {
+    gap: var(--space-lg);
+  }
+
+  .about-image-frame {
+    padding: var(--space-md);
+    max-width: 250px;
+    margin: 0 auto;
+  }
+
+  .about-image-frame::before,
+  .about-image-frame::after {
+    width: 60px;
+    height: 60px;
+  }
+
+  .about-image-placeholder {
+    font-size: 2.5rem;
+  }
+
+  .about-image-placeholder span {
+    font-size: 0.75rem;
+  }
+
+  .about-text h3 {
+    font-size: 1.15rem;
+    margin-bottom: var(--space-md);
+  }
+
+  .about-text p {
+    font-size: 0.85rem;
+    line-height: 1.5;
+    margin-bottom: var(--space-sm);
+  }
+
+  .about-features {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+  }
+
+  .about-feature {
+    padding: var(--space-sm);
+  }
+
+  .about-feature-icon {
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+
+  .about-feature span {
+    font-size: 0.75rem;
+  }
+
+  /* --- Footer mobile --- */
+  .footer {
+    padding: var(--space-2xl) 0 var(--space-md);
+  }
+
+  .footer-content {
+    gap: var(--space-lg);
+    margin-bottom: var(--space-lg);
+  }
+
+  .footer-brand h3 {
+    font-size: 1.4rem;
+  }
+
+  .footer-brand p {
+    font-size: 0.85rem;
+  }
+
+  .footer-links h4,
+  .footer-contact h4 {
+    font-size: 1rem;
+    margin-bottom: var(--space-sm);
+  }
+
+  .footer-links a {
+    font-size: 0.85rem;
+  }
+
+  .footer-contact p {
+    font-size: 0.85rem;
+  }
+
+  .footer-bottom p {
+    font-size: 0.75rem;
+  }
+
+  /* --- Navigation mobile --- */
+  .nav-logo {
+    font-size: 1.2rem;
+  }
+
+  .nav-menu {
+    top: 60px;
+    height: calc(100vh - 60px);
+    padding: var(--space-lg);
+  }
+
+  .nav-link {
+    font-size: 1rem;
+    padding: var(--space-sm) 0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  /* --- Modal mobile --- */
+  .modal {
+    padding: var(--space-lg);
+    width: 92%;
+  }
+
+  .modal-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+  }
+
+  .modal-title {
+    font-size: 1.2rem;
+  }
+
+  .modal-text {
+    font-size: 0.85rem;
   }
 }
 

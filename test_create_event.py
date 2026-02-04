@@ -31,7 +31,7 @@ start_time = tomorrow.replace(hour=14, minute=0, second=0, microsecond=0)
 end_time = start_time + timedelta(hours=1)
 
 event = {
-    'summary': '🧪 אירוע בדיקה - LISHAY',
+    'summary': '🧪 אירוע בדיקה - LISHAI',
     'description': 'אירוע בדיקה שנוצר אוטומטית מהקוד.\nאפשר למחוק אותו.',
     'start': {
         'dateTime': start_time.isoformat(),

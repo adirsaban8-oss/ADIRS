@@ -263,7 +263,7 @@ st.markdown("<p class='bsd-text'>בס\"ד</p>", unsafe_allow_html=True)
 
 st.markdown("""
 <div class='hero-container'>
-    <h1 class='hero-title'>LISHAY SIMANI</h1>
+    <h1 class='hero-title'>LISHAI SIMANI</h1>
     <p class='hero-subtitle'>מניקוריסטית מקצועית</p>
     <p class='hero-tagline'>יוקרה, מקצועיות ודיוק בכל ציפורן</p>
 </div>
@@ -635,7 +635,7 @@ with tab6:
 st.markdown("---")
 st.markdown("""
 <div class='footer-container'>
-    <p class='footer-brand'>LISHAY SIMANI</p>
+    <p class='footer-brand'>LISHAI SIMANI</p>
     <p class='footer-tagline'>מניקוריסטית מקצועית</p>
     <div class='footer-nav'>
         <span class='footer-link'>בית</span>

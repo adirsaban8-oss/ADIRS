@@ -1,5 +1,5 @@
 """
-Email Reminder Service for LISHAY SIMANI Booking System
+Email Reminder Service for LISHAI SIMANI Booking System
 Sends automatic reminders to customers before their appointments
 """
 
@@ -150,10 +150,10 @@ def send_email_reminder(to_email, customer_name, service, date, time, reminder_t
         msg['To'] = to_email
 
         if reminder_type == 'day_before':
-            msg['Subject'] = f'תזכורת: יש לך תור מחר אצל LISHAY SIMANI'
+            msg['Subject'] = f'תזכורת: יש לך תור מחר אצל LISHAI SIMANI'
             reminder_text = 'מחר'
         else:
-            msg['Subject'] = f'תזכורת: יש לך תור היום אצל LISHAY SIMANI'
+            msg['Subject'] = f'תזכורת: יש לך תור היום אצל LISHAI SIMANI'
             reminder_text = 'היום'
 
         # HTML email content
@@ -175,7 +175,7 @@ def send_email_reminder(to_email, customer_name, service, date, time, reminder_t
         <body>
             <div class="container">
                 <div class="header">
-                    <h1>LISHAY SIMANI</h1>
+                    <h1>LISHAI SIMANI</h1>
                     <p>תזכורת לתור</p>
                 </div>
 
@@ -202,7 +202,7 @@ def send_email_reminder(to_email, customer_name, service, date, time, reminder_t
 
                 <div class="footer">
                     <p>נשמח לראותך!</p>
-                    <p>LISHAY SIMANI - מניקוריסטית מקצועית</p>
+                    <p>LISHAI SIMANI - מניקוריסטית מקצועית</p>
                 </div>
             </div>
         </body>
@@ -223,7 +223,7 @@ def send_email_reminder(to_email, customer_name, service, date, time, reminder_t
         לביטול או שינוי תור: 051-5656295
 
         נשמח לראותך!
-        LISHAY SIMANI
+        LISHAI SIMANI
         """
 
         msg.attach(MIMEText(text_content, 'plain', 'utf-8'))

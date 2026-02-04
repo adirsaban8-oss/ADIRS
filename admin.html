@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Heebo', sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            direction: rtl;
+        }
+
+        /* --- Login Screen --- */
+        .login-screen {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-box {
+            background: #16213e;
+            border-radius: 16px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .login-box h1 {
+            color: #C4A35A;
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .login-box p {
+            color: #8a8a9a;
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #2a2a4a;
+            border-radius: 10px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 16px;
+            font-family: inherit;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: #C4A35A;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: #C4A35A;
+            color: #1a1a2e;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+
+        .login-btn:hover { background: #d4b76a; }
+
+        .login-error {
+            color: #ff6b6b;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            display: none;
+        }
+
+        /* --- Admin Panel --- */
+        .admin-panel { display: none; }
+
+        .admin-header {
+            background: #16213e;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #2a2a4a;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .admin-header h1 {
+            color: #C4A35A;
+            font-size: 1.2rem;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        .admin-tabs {
+            display: flex;
+            background: #16213e;
+            border-bottom: 1px solid #2a2a4a;
+            padding: 0 24px;
+        }
+
+        .admin-tab {
+            padding: 14px 24px;
+            background: transparent;
+            border: none;
+            color: #8a8a9a;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95rem;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .admin-tab.active {
+            color: #C4A35A;
+            border-bottom-color: #C4A35A;
+        }
+
+        .admin-tab:hover { color: #e0e0e0; }
+
+        .admin-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* --- Date Blocking --- */
+        .date-section {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .date-section h2 {
+            color: #C4A35A;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+        }
+
+        .date-picker-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #8a8a9a;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #fff;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #C4A35A;
+        }
+
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .slot-btn {
+            padding: 10px 8px;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            background: #0f3460;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            text-align: center;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .slot-btn:hover { border-color: #C4A35A; }
+
+        .slot-btn.blocked {
+            background: #ff6b6b;
+            color: #fff;
+            border-color: #ff6b6b;
+        }
+
+        .slot-btn.selected {
+            background: #C4A35A;
+            color: #1a1a2e;
+            border-color: #C4A35A;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .action-btn.primary {
+            background: #C4A35A;
+            color: #1a1a2e;
+        }
+
+        .action-btn.primary:hover { background: #d4b76a; }
+
+        .action-btn.danger {
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+
+        .action-btn.danger:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        .blocked-dates-list {
+            margin-top: 20px;
+        }
+
+        .blocked-date-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: #0f3460;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .blocked-date-item .date-label {
+            color: #C4A35A;
+            font-weight: 500;
+        }
+
+        .blocked-date-item .slots-label {
+            color: #8a8a9a;
+            font-size: 0.85rem;
+        }
+
+        .remove-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .remove-btn:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        /* --- Gallery Management --- */
+        .gallery-upload {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .gallery-upload h2 {
+            color: #C4A35A;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #2a2a4a;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 16px;
+        }
+
+        .upload-zone:hover {
+            border-color: #C4A35A;
+            background: rgba(196, 163, 90, 0.05);
+        }
+
+        .upload-zone i {
+            font-size: 2.5rem;
+            color: #C4A35A;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .upload-zone p {
+            color: #8a8a9a;
+            font-size: 0.9rem;
+        }
+
+        .upload-zone .formats {
+            font-size: 0.75rem;
+            color: #5a5a6a;
+            margin-top: 8px;
+        }
+
+        .gallery-admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .gallery-admin-item {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            background: #0f3460;
+        }
+
+        .gallery-admin-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-admin-item .delete-overlay {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 107, 107, 0.9);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .gallery-admin-item:hover .delete-overlay {
+            opacity: 1;
+        }
+
+        /* --- Status Messages --- */
+        .status-msg {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .status-msg.success {
+            background: rgba(46, 213, 115, 0.15);
+            color: #2ed573;
+            border: 1px solid rgba(46, 213, 115, 0.3);
+        }
+
+        .status-msg.error {
+            background: rgba(255, 107, 107, 0.15);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 480px) {
+            .admin-header { padding: 12px 16px; }
+            .admin-tabs { padding: 0 16px; }
+            .admin-tab { padding: 12px 16px; font-size: 0.85rem; }
+            .admin-content { padding: 16px; }
+            .date-section, .gallery-upload { padding: 16px; }
+            .slots-grid { grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); }
+            .gallery-admin-grid { grid-template-columns: repeat(2, 1fr); }
+            .date-picker-row { flex-direction: column; }
+            .form-group { min-width: unset; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-box">
+            <h1><i class="fas fa-lock"></i> Admin Panel</h1>
+            <p>Enter password to access</p>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <input type="password" class="login-input" id="passwordInput" placeholder="Password" autocomplete="current-password" required>
+                <button type="submit" class="login-btn">Login</button>
+            </form>
+            <p class="login-error" id="loginError">Incorrect password</p>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div class="admin-panel" id="adminPanel">
+        <div class="admin-header">
+            <h1><i class="fas fa-cog"></i> LISHAI SIMANI - Admin</h1>
+            <button class="logout-btn" onclick="handleLogout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
+        </div>
+
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="blocking" onclick="switchTab('blocking')">
+                <i class="fas fa-calendar-times"></i> Date Blocking
+            </button>
+            <button class="admin-tab" data-tab="gallery" onclick="switchTab('gallery')">
+                <i class="fas fa-images"></i> Gallery
+            </button>
+        </div>
+
+        <div class="admin-content">
+            <!-- Date Blocking Tab -->
+            <div class="tab-content active" id="tab-blocking">
+                <div class="date-section">
+                    <h2><i class="fas fa-calendar-alt"></i> Block Time Slots</h2>
+                    <div id="blockingStatus" class="status-msg"></div>
+
+                    <div class="date-picker-row">
+                        <div class="form-group">
+                            <label>Select Date</label>
+                            <input type="date" id="blockDate" onchange="loadSlotsForDate()">
+                        </div>
+                    </div>
+
+                    <div id="slotsContainer" style="display:none;">
+                        <p style="color: #8a8a9a; font-size: 0.85rem; margin-bottom: 12px;">
+                            Click slots to toggle block status. <span style="color: #ff6b6b;">Red = Blocked</span>
+                        </p>
+                        <div class="slots-grid" id="slotsGrid"></div>
+
+                        <div class="action-row">
+                            <button class="action-btn primary" onclick="saveBlockedSlots()">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                            <button class="action-btn danger" onclick="blockAllSlots()">
+                                <i class="fas fa-ban"></i> Block Entire Day
+                            </button>
+                            <button class="action-btn danger" onclick="clearBlockedSlots()">
+                                <i class="fas fa-undo"></i> Unblock All
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="date-section">
+                    <h2><i class="fas fa-list"></i> Currently Blocked Dates</h2>
+                    <div class="blocked-dates-list" id="blockedDatesList">
+                        <p style="color: #5a5a6a;">Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gallery Tab -->
+            <div class="tab-content" id="tab-gallery">
+                <div class="gallery-upload">
+                    <h2><i class="fas fa-cloud-upload-alt"></i> Upload Image</h2>
+                    <div id="galleryStatus" class="status-msg"></div>
+
+                    <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Click to upload an image</p>
+                        <p class="formats">JPG, PNG, WebP | Max 5MB</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.webp" style="display:none" onchange="uploadImage()">
+                </div>
+
+                <div class="gallery-upload">
+                    <h2><i class="fas fa-th"></i> Current Gallery</h2>
+                    <div class="gallery-admin-grid" id="galleryGrid">
+                        <p style="color: #5a5a6a;">Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ============== AUTH ==============
+
+    async function handleLogin(e) {
+        e.preventDefault();
+        const password = document.getElementById('passwordInput').value;
+        const errorEl = document.getElementById('loginError');
+        errorEl.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+
+            if (res.ok) {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                loadBlockedDates();
+                loadGallery();
+            } else {
+                errorEl.textContent = 'Incorrect password';
+                errorEl.style.display = 'block';
+            }
+        } catch (err) {
+            errorEl.textContent = 'Connection error';
+            errorEl.style.display = 'block';
+        }
+    }
+
+    async function handleLogout() {
+        await fetch('/api/admin/logout', { method: 'POST' });
+        document.getElementById('adminPanel').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('passwordInput').value = '';
+    }
+
+    // ============== TABS ==============
+
+    function switchTab(tab) {
+        document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+
+    // ============== STATUS MESSAGES ==============
+
+    function showStatus(containerId, message, type) {
+        const el = document.getElementById(containerId);
+        el.textContent = message;
+        el.className = `status-msg ${type}`;
+        el.style.display = 'block';
+        setTimeout(() => { el.style.display = 'none'; }, 4000);
+    }
+
+    // ============== DATE BLOCKING ==============
+
+    const ALL_SLOTS = [];
+    const openTime = 9 * 60; // 09:00 in minutes
+    const closeTime = 20 * 60; // 20:00 in minutes
+    for (let m = openTime; m < closeTime; m += 30) {
+        const h = String(Math.floor(m / 60)).padStart(2, '0');
+        const min = String(m % 60).padStart(2, '0');
+        ALL_SLOTS.push(`${h}:${min}`);
+    }
+
+    let currentBlockedSlots = [];
+
+    async function loadSlotsForDate() {
+        const dateStr = document.getElementById('blockDate').value;
+        if (!dateStr) return;
+
+        const container = document.getElementById('slotsContainer');
+        const grid = document.getElementById('slotsGrid');
+        container.style.display = 'block';
+
+        // Check if it's a business day (Sun-Thu)
+        const date = new Date(dateStr);
+        const day = date.getDay();
+        if (day === 5 || day === 6) {
+            grid.innerHTML = '<p style="grid-column: 1/-1; color: #8a8a9a;">Closed on this day (Friday/Saturday)</p>';
+            return;
+        }
+
+        // Load existing blocked slots for this date
+        try {
+            const res = await fetch('/api/admin/blocked-slots');
+            const data = await res.json();
+            currentBlockedSlots = data[dateStr] || [];
+        } catch (err) {
+            currentBlockedSlots = [];
+        }
+
+        renderSlots();
+    }
+
+    function renderSlots() {
+        const grid = document.getElementById('slotsGrid');
+        grid.innerHTML = '';
+
+        ALL_SLOTS.forEach(slot => {
+            const btn = document.createElement('button');
+            btn.className = 'slot-btn' + (currentBlockedSlots.includes(slot) ? ' blocked' : '');
+            btn.textContent = slot;
+            btn.onclick = () => {
+                if (currentBlockedSlots.includes(slot)) {
+                    currentBlockedSlots = currentBlockedSlots.filter(s => s !== slot);
+                    btn.classList.remove('blocked');
+                } else {
+                    currentBlockedSlots.push(slot);
+                    btn.classList.add('blocked');
+                }
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function blockAllSlots() {
+        currentBlockedSlots = [...ALL_SLOTS];
+        renderSlots();
+    }
+
+    function clearBlockedSlots() {
+        currentBlockedSlots = [];
+        renderSlots();
+    }
+
+    async function saveBlockedSlots() {
+        const dateStr = document.getElementById('blockDate').value;
+        if (!dateStr) return;
+
+        try {
+            const res = await fetch('/api/admin/blocked-slots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, slots: currentBlockedSlots })
+            });
+
+            if (res.ok) {
+                showStatus('blockingStatus', 'Changes saved successfully!', 'success');
+                loadBlockedDates();
+            } else {
+                showStatus('blockingStatus', 'Error saving changes', 'error');
+            }
+        } catch (err) {
+            showStatus('blockingStatus', 'Connection error', 'error');
+        }
+    }
+
+    async function loadBlockedDates() {
+        const list = document.getElementById('blockedDatesList');
+
+        try {
+            const res = await fetch('/api/admin/blocked-slots');
+            const data = await res.json();
+
+            const dates = Object.keys(data).sort();
+            if (dates.length === 0) {
+                list.innerHTML = '<p style="color: #5a5a6a;">No blocked dates</p>';
+                return;
+            }
+
+            list.innerHTML = '';
+            dates.forEach(dateStr => {
+                const slots = data[dateStr];
+                const item = document.createElement('div');
+                item.className = 'blocked-date-item';
+
+                const slotsText = slots.length === ALL_SLOTS.length
+                    ? 'Entire day blocked'
+                    : `${slots.length} slots blocked: ${slots.slice(0, 4).join(', ')}${slots.length > 4 ? '...' : ''}`;
+
+                item.innerHTML = `
+                    <div>
+                        <span class="date-label">${dateStr}</span>
+                        <br><span class="slots-label">${slotsText}</span>
+                    </div>
+                    <button class="remove-btn" onclick="removeBlockedDate('${dateStr}')">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        } catch (err) {
+            list.innerHTML = '<p style="color: #ff6b6b;">Error loading data</p>';
+        }
+    }
+
+    async function removeBlockedDate(dateStr) {
+        try {
+            await fetch('/api/admin/blocked-slots/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr })
+            });
+            showStatus('blockingStatus', `Unblocked ${dateStr}`, 'success');
+            loadBlockedDates();
+
+            // Refresh slots view if same date is selected
+            if (document.getElementById('blockDate').value === dateStr) {
+                currentBlockedSlots = [];
+                renderSlots();
+            }
+        } catch (err) {
+            showStatus('blockingStatus', 'Error removing block', 'error');
+        }
+    }
+
+    // ============== GALLERY ==============
+
+    async function loadGallery() {
+        const grid = document.getElementById('galleryGrid');
+
+        try {
+            const res = await fetch('/api/admin/gallery');
+            const data = await res.json();
+            const images = data.images || [];
+
+            if (images.length === 0) {
+                grid.innerHTML = '<p style="color: #5a5a6a; grid-column: 1/-1;">No images in gallery</p>';
+                return;
+            }
+
+            grid.innerHTML = '';
+            images.forEach(filename => {
+                const item = document.createElement('div');
+                item.className = 'gallery-admin-item';
+                item.innerHTML = `
+                    <img src="/static/images/${filename}" alt="${filename}" loading="lazy">
+                    <button class="delete-overlay" onclick="deleteImage('${filename}')" title="Delete image">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                grid.appendChild(item);
+            });
+        } catch (err) {
+            grid.innerHTML = '<p style="color: #ff6b6b;">Error loading gallery</p>';
+        }
+    }
+
+    async function uploadImage() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        // Validate size
+        if (file.size > 5 * 1024 * 1024) {
+            showStatus('galleryStatus', 'File too large. Max 5MB.', 'error');
+            fileInput.value = '';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch('/api/admin/gallery/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await res.json();
+            if (res.ok) {
+                showStatus('galleryStatus', 'Image uploaded!', 'success');
+                loadGallery();
+            } else {
+                showStatus('galleryStatus', result.error || 'Upload failed', 'error');
+            }
+        } catch (err) {
+            showStatus('galleryStatus', 'Upload failed', 'error');
+        }
+
+        fileInput.value = '';
+    }
+
+    async function deleteImage(filename) {
+        if (!confirm(`Delete ${filename}?`)) return;
+
+        try {
+            const res = await fetch('/api/admin/gallery/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
+            });
+
+            if (res.ok) {
+                showStatus('galleryStatus', 'Image deleted', 'success');
+                loadGallery();
+            } else {
+                showStatus('galleryStatus', 'Delete failed', 'error');
+            }
+        } catch (err) {
+            showStatus('galleryStatus', 'Delete failed', 'error');
+        }
+    }
+
+    // ============== DRAG AND DROP ==============
+
+    const uploadZone = document.getElementById('uploadZone');
+
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.style.borderColor = '#C4A35A';
+        uploadZone.style.background = 'rgba(196, 163, 90, 0.08)';
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.style.borderColor = '#2a2a4a';
+        uploadZone.style.background = 'transparent';
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.style.borderColor = '#2a2a4a';
+        uploadZone.style.background = 'transparent';
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const fileInput = document.getElementById('fileInput');
+            fileInput.files = files;
+            uploadImage();
+        }
+    });
+
+    // Set minimum date for date picker
+    const blockDateInput = document.getElementById('blockDate');
+    const today = new Date().toISOString().split('T')[0];
+    blockDateInput.setAttribute('min', today);
+    </script>
+</body>
+</html>

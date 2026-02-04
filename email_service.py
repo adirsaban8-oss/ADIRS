@@ -1,5 +1,5 @@
 """
-Email Service Module for LISHAY Booking System
+Email Service Module for LISHAI Booking System
 Uses SendGrid HTTP API (no SMTP)
 """
 
@@ -27,10 +27,10 @@ if hasattr(sys.stdout, 'reconfigure'):
 # SendGrid configuration
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
 EMAIL_FROM = os.getenv('EMAIL_FROM', '')
-EMAIL_SENDER_NAME = os.getenv('EMAIL_SENDER_NAME', 'LISHAY SIMANI')
+EMAIL_SENDER_NAME = os.getenv('EMAIL_SENDER_NAME', 'LISHAI SIMANI')
 
 # Business info
-BUSINESS_NAME = 'LISHAY SIMANI'
+BUSINESS_NAME = 'LISHAI SIMANI'
 BUSINESS_PHONE = '051-5656295'
 BUSINESS_ADDRESS = 'משעול הרקפת 3, קרני שומרון'
 

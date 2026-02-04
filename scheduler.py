@@ -1,5 +1,5 @@
 """
-Appointment Reminder Scheduler for LISHAY SIMANI
+Appointment Reminder Scheduler for LISHAI SIMANI
 Runs background jobs to send email reminders to customers
 """
 
