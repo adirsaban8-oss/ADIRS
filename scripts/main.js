@@ -89,9 +89,9 @@ const today = new Date();
 const todayStr = today.toISOString().split('T')[0];
 dateInput.setAttribute('min', todayStr);
 
-// Set maximum date to 60 days from now
+// Set maximum date to 30 days from now
 const maxDate = new Date();
-maxDate.setDate(maxDate.getDate() + 60);
+maxDate.setDate(maxDate.getDate() + 30);
 dateInput.setAttribute('max', maxDate.toISOString().split('T')[0]);
 
 // Check if date is a business day
@@ -263,6 +263,22 @@ bookingForm.addEventListener('submit', async (e) => {
         return;
     }
 
+    // Check if user already has a future appointment
+    const restrictionMsg = document.getElementById('bookingRestrictionMsg');
+    if (restrictionMsg) restrictionMsg.style.display = 'none';
+
+    const existingApt = await MyAppointments.checkBookingRestriction(bookingData.phone);
+    if (existingApt) {
+        if (restrictionMsg) {
+            restrictionMsg.textContent =
+                'כבר יש לך תור בתאריך ' + existingApt.date +
+                ' בשעה ' + existingApt.time +
+                '. ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.';
+            restrictionMsg.style.display = '';
+        }
+        return;
+    }
+
     isBookingSubmitting = true;
     const submitBtn = bookingForm.querySelector('button[type="submit"]');
     const originalText = submitBtn.innerHTML;
@@ -286,6 +302,7 @@ bookingForm.addEventListener('submit', async (e) => {
         const result = await response.json();
 
         if (response.ok && result.success) {
+            MyAppointments.storeUserIdentity(bookingData.phone, bookingData.email);
             showModal({ ...bookingData, serviceKey: serviceKey });
             bookingForm.reset();
             timeSlotsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>';
@@ -466,6 +483,213 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 
 // ============== INITIALIZE ==============
 
+// ============== MY APPOINTMENTS ==============
+
+const MyAppointments = {
+    CACHE_KEY_PHONE: 'lishai_user_phone',
+    CACHE_KEY_EMAIL: 'lishai_user_email',
+
+    getStoredPhone() {
+        return localStorage.getItem(this.CACHE_KEY_PHONE) || '';
+    },
+
+    getStoredEmail() {
+        return localStorage.getItem(this.CACHE_KEY_EMAIL) || '';
+    },
+
+    storeUserIdentity(phone, email) {
+        if (phone) localStorage.setItem(this.CACHE_KEY_PHONE, phone);
+        if (email) localStorage.setItem(this.CACHE_KEY_EMAIL, email);
+    },
+
+    clearUserIdentity() {
+        localStorage.removeItem(this.CACHE_KEY_PHONE);
+        localStorage.removeItem(this.CACHE_KEY_EMAIL);
+    },
+
+    async fetchAppointments(phone) {
+        const p = phone.trim().replace(/[-\s]/g, '');
+        const response = await fetch(
+            `${CONFIG.API_BASE}/api/my-appointments?phone=${encodeURIComponent(p)}`
+        );
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed to fetch appointments');
+        }
+        return response.json();
+    },
+
+    showPhoneForm() {
+        document.getElementById('aptPhoneForm').style.display = '';
+        document.getElementById('aptLoading').style.display = 'none';
+        document.getElementById('aptResults').style.display = 'none';
+        document.getElementById('aptEmpty').style.display = 'none';
+    },
+
+    showLoading() {
+        document.getElementById('aptPhoneForm').style.display = 'none';
+        document.getElementById('aptLoading').style.display = '';
+        document.getElementById('aptResults').style.display = 'none';
+        document.getElementById('aptEmpty').style.display = 'none';
+    },
+
+    showResults(phone, appointments) {
+        document.getElementById('aptPhoneForm').style.display = 'none';
+        document.getElementById('aptLoading').style.display = 'none';
+        document.getElementById('aptResults').style.display = '';
+        document.getElementById('aptEmpty').style.display = 'none';
+
+        document.getElementById('aptUserPhone').textContent = phone;
+
+        const container = document.getElementById('aptCardsList');
+        container.innerHTML = '';
+
+        appointments.forEach(function(apt) {
+            const card = document.createElement('div');
+            card.className = 'apt-card fade-in visible';
+            card.innerHTML =
+                '<div class="apt-card-service">' + apt.service + '</div>' +
+                '<div class="apt-card-datetime">' +
+                    '<i class="fas fa-calendar" style="color: var(--color-gold); margin-left: 8px;"></i>' +
+                    apt.date + ' | ' + apt.time +
+                '</div>' +
+                '<div class="apt-card-day">יום ' + apt.day_name + '</div>';
+            container.appendChild(card);
+        });
+    },
+
+    showEmpty(phone) {
+        document.getElementById('aptPhoneForm').style.display = 'none';
+        document.getElementById('aptLoading').style.display = 'none';
+        document.getElementById('aptResults').style.display = 'none';
+        document.getElementById('aptEmpty').style.display = '';
+
+        document.getElementById('aptEmptyPhone').textContent = phone;
+    },
+
+    showPhoneError(message) {
+        const el = document.getElementById('aptPhoneError');
+        el.textContent = message;
+        el.style.display = '';
+    },
+
+    hidePhoneError() {
+        document.getElementById('aptPhoneError').style.display = 'none';
+    },
+
+    async lookupPhone(phone) {
+        if (!phone || phone.replace(/[-\s]/g, '').length < 9) {
+            this.showPhoneError('נא להזין מספר טלפון תקין');
+            return;
+        }
+
+        this.hidePhoneError();
+        this.storeUserIdentity(phone);
+        this.showLoading();
+
+        try {
+            const data = await this.fetchAppointments(phone);
+
+            if (data.appointments && data.appointments.length > 0) {
+                this.showResults(phone, data.appointments);
+                this.updateHomeBubble(data.appointments[0]);
+            } else {
+                this.showEmpty(phone);
+                this.hideHomeBubble();
+            }
+        } catch (err) {
+            console.error('My appointments error:', err);
+            this.showPhoneForm();
+            this.showPhoneError('שגיאה בחיפוש. נסי שוב.');
+        }
+    },
+
+    reset() {
+        this.clearUserIdentity();
+        this.showPhoneForm();
+        this.hideHomeBubble();
+        const input = document.getElementById('aptPhoneInput');
+        if (input) input.value = '';
+    },
+
+    updateHomeBubble(appointment) {
+        const bubble = document.getElementById('homeAppointmentBubble');
+        if (!bubble || !appointment) return;
+
+        bubble.style.display = '';
+        bubble.innerHTML =
+            '<a href="#my-appointments" class="apt-bubble-inner">' +
+                '<i class="fas fa-calendar-check"></i>' +
+                '<span>יש לך תור ב-' + appointment.date + ' בשעה ' + appointment.time + '</span>' +
+            '</a>';
+    },
+
+    hideHomeBubble() {
+        const bubble = document.getElementById('homeAppointmentBubble');
+        if (bubble) {
+            bubble.style.display = 'none';
+            bubble.innerHTML = '';
+        }
+    },
+
+    async checkBookingRestriction(phone) {
+        if (!phone) return null;
+        try {
+            const data = await this.fetchAppointments(phone);
+            if (data.appointments && data.appointments.length > 0) {
+                return data.appointments[0];
+            }
+        } catch (e) {
+            console.error('Booking restriction check error:', e);
+        }
+        return null;
+    },
+
+    init() {
+        const phoneInput = document.getElementById('aptPhoneInput');
+        const phoneSubmit = document.getElementById('aptPhoneSubmit');
+
+        if (phoneSubmit) {
+            phoneSubmit.addEventListener('click', () => {
+                this.lookupPhone(phoneInput.value);
+            });
+        }
+
+        if (phoneInput) {
+            phoneInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.lookupPhone(phoneInput.value);
+                }
+            });
+        }
+
+        const resetBtn = document.getElementById('aptResetBtn');
+        const emptyResetBtn = document.getElementById('aptEmptyResetBtn');
+
+        if (resetBtn) resetBtn.addEventListener('click', () => this.reset());
+        if (emptyResetBtn) emptyResetBtn.addEventListener('click', () => this.reset());
+
+        // Auto-lookup if phone stored in localStorage
+        const storedPhone = this.getStoredPhone();
+        if (storedPhone) {
+            if (phoneInput) phoneInput.value = storedPhone;
+            this.lookupPhone(storedPhone);
+        }
+
+        // Pre-fill booking form from stored identity
+        const storedEmail = this.getStoredEmail();
+        if (storedPhone) {
+            const phoneField = bookingForm.querySelector('input[name="phone"]');
+            if (phoneField && !phoneField.value) phoneField.value = storedPhone;
+        }
+        if (storedEmail) {
+            const emailField = bookingForm.querySelector('input[name="email"]');
+            if (emailField && !emailField.value) emailField.value = storedEmail;
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('LISHAI SIMANI Beauty Studio - Website Loaded');
 
@@ -473,6 +697,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.hero .fade-in').forEach(el => {
         el.classList.add('visible');
     });
+
+    // Initialize My Appointments
+    MyAppointments.init();
 });
 
 // Make closeModal available globally

@@ -133,6 +133,100 @@ def cleanup_old_reminders():
     sent_reminders = {k: v for k, v in sent_reminders.items() if v >= today}
 
 
+# ============== MY APPOINTMENTS ==============
+
+# Cache for appointment queries: { phone_normalized: { "data": [...], "timestamp": datetime } }
+_appointments_cache = {}
+APPOINTMENTS_CACHE_TTL = 300  # 5 minutes
+
+
+def normalize_phone(phone):
+    """Normalize phone number for consistent comparison."""
+    p = phone.strip().replace('-', '').replace(' ', '')
+    if p.startswith('+972'):
+        p = '0' + p[4:]
+    elif p.startswith('972') and len(p) > 10:
+        p = '0' + p[3:]
+    return p
+
+
+def get_appointments_by_phone(phone):
+    """Query Google Calendar for future events belonging to a phone number."""
+    global _appointments_cache
+
+    phone_norm = normalize_phone(phone)
+    now = datetime.now(ISRAEL_TZ)
+
+    # Check cache
+    cached = _appointments_cache.get(phone_norm)
+    if cached and (now - cached['timestamp']).total_seconds() < APPOINTMENTS_CACHE_TTL:
+        return cached['data']
+
+    try:
+        service = get_calendar_service()
+
+        time_min = now.isoformat()
+        time_max = (now + timedelta(days=60)).isoformat()
+
+        events_result = service.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy='startTime',
+            maxResults=250
+        ).execute()
+
+        events = events_result.get('items', [])
+        appointments = []
+
+        for event in events:
+            description = event.get('description', '')
+            if not description:
+                continue
+
+            lines = [line.strip() for line in description.strip().split('\n') if line.strip()]
+
+            # Phone is at index 2 (service_he, name, phone, email)
+            event_phone = ''
+            if len(lines) >= 3:
+                event_phone = normalize_phone(lines[2])
+
+            if event_phone != phone_norm:
+                continue
+
+            start_str = event['start'].get('dateTime', '')
+            if not start_str:
+                continue
+
+            event_start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+            event_start_il = event_start.astimezone(ISRAEL_TZ)
+
+            days_hebrew = ['שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת', 'ראשון']
+            day_name = days_hebrew[event_start_il.weekday()]
+
+            service_name = lines[0] if lines else event.get('summary', '')
+
+            appointments.append({
+                'service': service_name,
+                'date': event_start_il.strftime('%d/%m/%Y'),
+                'time': event_start_il.strftime('%H:%M'),
+                'day_name': day_name,
+                'iso_date': event_start_il.strftime('%Y-%m-%d'),
+            })
+
+        _appointments_cache[phone_norm] = {
+            'data': appointments,
+            'timestamp': now
+        }
+
+        return appointments
+
+    except Exception as e:
+        print(f"Error fetching appointments by phone: {str(e)}")
+        return []
+
+
 def check_and_send_reminders():
     """
     Check for upcoming appointments and send reminders.
@@ -384,6 +478,27 @@ def book_appointment():
             if not data.get(field):
                 return jsonify({"error": f"Missing required field: {field}"}), 400
 
+        # Max 30 days validation
+        try:
+            booking_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+            today_date = datetime.now(ISRAEL_TZ).date()
+            max_allowed = today_date + timedelta(days=30)
+            if booking_date > max_allowed:
+                return jsonify({"error": "ניתן להזמין תור עד 30 יום קדימה בלבד."}), 400
+        except ValueError:
+            return jsonify({"error": "Invalid date format"}), 400
+
+        # Check if user already has a future appointment
+        if data.get('phone'):
+            existing = get_appointments_by_phone(data['phone'])
+            if existing:
+                next_apt = existing[0]
+                return jsonify({
+                    "error": f"כבר יש לך תור בתאריך {next_apt['date']} בשעה {next_apt['time']}. "
+                             f"ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.",
+                    "existing_appointment": next_apt
+                }), 409
+
         # Find service details
         service = None
         for s in SERVICES:
@@ -421,6 +536,8 @@ def book_appointment():
         try:
             event = create_event(booking_data)
             print(f"Calendar event created: {event.get('id') if event else 'N/A'}")
+            # Invalidate appointments cache for this phone
+            _appointments_cache.pop(normalize_phone(data['phone']), None)
         except Exception as cal_error:
             print(f"Failed to create calendar event: {str(cal_error)}")
             # Continue - we'll still send confirmation email
@@ -483,6 +600,28 @@ def contact():
     return jsonify({
         "success": True,
         "message": "ההודעה נשלחה בהצלחה! אחזור אלייך בהקדם."
+    })
+
+
+# ============== MY APPOINTMENTS ==============
+
+@app.route('/api/my-appointments', methods=['GET'])
+def my_appointments():
+    """Get future appointments for a phone number."""
+    phone = request.args.get('phone', '').strip()
+
+    if not phone:
+        return jsonify({"error": "Phone number is required"}), 400
+
+    phone_clean = phone.replace('-', '').replace(' ', '').replace('+', '')
+    if not phone_clean.isdigit() or len(phone_clean) < 9:
+        return jsonify({"error": "Invalid phone number"}), 400
+
+    appointments = get_appointments_by_phone(phone)
+
+    return jsonify({
+        "appointments": appointments,
+        "count": len(appointments)
     })
 
 

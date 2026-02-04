@@ -592,6 +592,228 @@ body {
   box-shadow: 0 0 0 4px var(--color-focus);
 }
 
+/* ============== MY APPOINTMENTS SECTION ============== */
+
+.my-appointments {
+  background: linear-gradient(180deg, var(--color-bg-secondary) 0%, var(--color-bg-primary) 100%);
+}
+
+.my-apt-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.apt-phone-card {
+  background: var(--color-bg-card);
+  padding: var(--space-2xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.apt-phone-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-gold-light), var(--color-gold-muted));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+  font-size: 2rem;
+  color: var(--color-gold-dark);
+  box-shadow: var(--shadow-gold);
+}
+
+.apt-phone-card h3 {
+  font-family: var(--font-hebrew-heading);
+  font-size: var(--font-size-h4);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.apt-phone-card p {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-lg);
+}
+
+.apt-phone-input-row {
+  display: flex;
+  gap: var(--space-sm);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.apt-phone-input-row .input {
+  flex: 1;
+  text-align: center;
+}
+
+.apt-phone-input-row .btn {
+  white-space: nowrap;
+}
+
+.apt-user-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  margin-bottom: var(--space-lg);
+}
+
+.apt-user-phone {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  direction: ltr;
+  unicode-bidi: embed;
+}
+
+.apt-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  background: none;
+  border: none;
+  font-family: var(--font-primary);
+}
+
+.apt-reset-btn:hover {
+  color: var(--color-gold);
+}
+
+.apt-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.apt-card {
+  background: var(--color-bg-card);
+  padding: var(--space-xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  border-right: 4px solid var(--color-gold);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-luxury);
+}
+
+.apt-card:hover {
+  box-shadow: var(--shadow-gold);
+  border-color: var(--color-gold);
+}
+
+.apt-card-service {
+  font-family: var(--font-hebrew-heading);
+  font-size: var(--font-size-h4);
+  color: var(--color-gold);
+  margin-bottom: var(--space-sm);
+}
+
+.apt-card-datetime {
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.apt-card-day {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+}
+
+.apt-empty-card {
+  background: var(--color-bg-card);
+  padding: var(--space-2xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.apt-empty-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--color-bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+  font-size: 2rem;
+  color: var(--color-text-tertiary);
+}
+
+.apt-empty-card h3 {
+  font-family: var(--font-hebrew-heading);
+  font-size: var(--font-size-h4);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.apt-empty-card p {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-lg);
+}
+
+.apt-inline-message {
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-small);
+  margin-top: var(--space-sm);
+  text-align: center;
+  line-height: 1.6;
+}
+
+.apt-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.apt-warning {
+  background: #FFF3CD;
+  color: #856404;
+}
+
+.home-appointment-bubble {
+  margin-top: var(--space-lg);
+  animation: fadeInUp 0.8s ease-out 0.5s backwards;
+}
+
+.home-appointment-bubble .apt-bubble-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-xl);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-gold);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-small);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-gold);
+  cursor: pointer;
+  transition: all var(--transition-luxury);
+}
+
+.home-appointment-bubble .apt-bubble-inner:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-luxury);
+}
+
+.home-appointment-bubble .apt-bubble-inner i {
+  color: var(--color-gold);
+}
+
 /* ============== GALLERY SECTION ============== */
 
 .gallery {
@@ -1070,6 +1292,15 @@ body {
   .about-features {
     grid-template-columns: 1fr 1fr;
   }
+
+  /* --- My Appointments tablet --- */
+  .apt-phone-input-row {
+    flex-direction: column;
+  }
+
+  .apt-phone-card {
+    padding: var(--space-lg);
+  }
 }
 
 /* ============== MOBILE OPTIMIZATION (iPhone 375-430px) ============== */
@@ -1392,6 +1623,34 @@ body {
 
   .about-feature span {
     font-size: 0.75rem;
+  }
+
+  /* --- My Appointments mobile --- */
+  .apt-phone-card {
+    padding: var(--space-md);
+  }
+
+  .apt-phone-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 1.5rem;
+  }
+
+  .apt-phone-card h3 {
+    font-size: 1rem;
+  }
+
+  .apt-card {
+    padding: var(--space-md);
+  }
+
+  .apt-user-bar {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .home-appointment-bubble .apt-bubble-inner {
+    font-size: 0.8rem;
+    padding: var(--space-xs) var(--space-md);
   }
 
   /* --- Footer mobile --- */

@@ -49,6 +49,7 @@
                 <li><a href="#services" class="nav-link">שירותים</a></li>
                 <li><a href="#policies" class="nav-link">מדיניות</a></li>
                 <li><a href="#booking" class="nav-link">הזמנת תור</a></li>
+                <li><a href="#my-appointments" class="nav-link">התורים שלי</a></li>
                 <li><a href="#gallery" class="nav-link">גלריה</a></li>
                 <li><a href="#contact" class="nav-link">צור קשר</a></li>
                 <li><a href="#about" class="nav-link">אודות</a></li>
@@ -70,6 +71,7 @@
                 <a href="#booking" class="btn btn-primary btn-lg">הזמיני תור</a>
                 <a href="#services" class="btn btn-outline btn-lg">השירותים שלנו</a>
             </div>
+            <div id="homeAppointmentBubble" class="home-appointment-bubble" style="display: none;"></div>
         </div>
     </section>
 
@@ -299,11 +301,86 @@
                             <textarea class="input input-textarea" name="notes" placeholder="הערות נוספות..."></textarea>
                         </div>
 
+                        <div id="bookingRestrictionMsg" class="apt-inline-message apt-warning" style="display: none;"></div>
+
                         <button type="submit" class="btn btn-primary btn-full-width btn-lg">
                             <i class="fas fa-calendar-check"></i>
                             אשרי הזמנה
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- My Appointments Section -->
+    <section id="my-appointments" class="my-appointments section">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">התורים שלי</h2>
+                <div class="divider"></div>
+                <p class="section-subtitle">צפי בתורים הקרובים שלך</p>
+            </div>
+
+            <div class="my-apt-container">
+                <!-- State 1: Phone input -->
+                <div id="aptPhoneForm" class="apt-phone-form">
+                    <div class="apt-phone-card">
+                        <div class="apt-phone-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <h3>הזדהי לצפייה בתורים שלך</h3>
+                        <p>הכניסי את מספר הטלפון שאיתו הזמנת</p>
+                        <div class="apt-phone-input-row">
+                            <input type="tel" id="aptPhoneInput" class="input" placeholder="050-0000000" dir="ltr">
+                            <button id="aptPhoneSubmit" class="btn btn-primary">
+                                <i class="fas fa-search"></i>
+                                חפשי
+                            </button>
+                        </div>
+                        <div id="aptPhoneError" class="apt-inline-message apt-error" style="display: none;"></div>
+                    </div>
+                </div>
+
+                <!-- State 2: Loading -->
+                <div id="aptLoading" class="apt-loading" style="display: none;">
+                    <p class="loading" style="text-align: center; color: var(--color-text-tertiary);">
+                        <i class="fas fa-spinner fa-spin"></i> מחפשת תורים...
+                    </p>
+                </div>
+
+                <!-- State 3: Results -->
+                <div id="aptResults" style="display: none;">
+                    <div class="apt-user-bar">
+                        <span id="aptUserPhone" class="apt-user-phone"></span>
+                        <button id="aptResetBtn" class="apt-reset-btn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            זה לא אני
+                        </button>
+                    </div>
+                    <div id="aptCardsList" class="apt-cards-list"></div>
+                </div>
+
+                <!-- State 4: Empty -->
+                <div id="aptEmpty" style="display: none;">
+                    <div class="apt-user-bar">
+                        <span id="aptEmptyPhone" class="apt-user-phone"></span>
+                        <button id="aptEmptyResetBtn" class="apt-reset-btn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            זה לא אני
+                        </button>
+                    </div>
+                    <div class="apt-empty-card">
+                        <div class="apt-empty-icon">
+                            <i class="fas fa-calendar-times"></i>
+                        </div>
+                        <h3>אין תורים קרובים</h3>
+                        <p>לא נמצאו תורים עתידיים עבורך</p>
+                        <a href="#booking" class="btn btn-primary">
+                            <i class="fas fa-calendar-plus"></i>
+                            הזמיני תור
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
