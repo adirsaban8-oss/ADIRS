@@ -64,6 +64,96 @@ body {
   border-radius: 2px;
 }
 
+/* ============== IDENTITY SCREEN ============== */
+
+.identity-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--color-bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+}
+
+.identity-card {
+  background: var(--color-bg-card);
+  padding: var(--space-2xl) var(--space-2xl) var(--space-xl);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border-gold);
+  box-shadow: var(--shadow-luxury);
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.identity-logo {
+  font-family: var(--font-english-display);
+  font-size: 1.8rem;
+  font-weight: var(--font-weight-light);
+  color: var(--color-gold);
+  letter-spacing: var(--letter-spacing-editorial);
+  text-transform: uppercase;
+  margin-bottom: var(--space-lg);
+}
+
+.identity-title {
+  font-family: var(--font-hebrew-heading);
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-xs);
+}
+
+.identity-subtitle {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-xl);
+}
+
+.identity-form .input-group {
+  text-align: right;
+  margin-bottom: var(--space-md);
+}
+
+.identity-form .btn {
+  margin-top: var(--space-md);
+}
+
+.identity-reset-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-primary);
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-tertiary);
+  transition: color var(--transition-fast);
+  padding: var(--space-xs) 0;
+}
+
+.identity-reset-btn:hover {
+  color: var(--color-gold);
+}
+
+.identity-reset-btn i {
+  margin-left: 4px;
+}
+
+@media (max-width: 480px) {
+  .identity-card {
+    padding: var(--space-lg) var(--space-md);
+  }
+
+  .identity-logo {
+    font-size: 1.4rem;
+  }
+
+  .identity-title {
+    font-size: 1.2rem;
+  }
+}
+
 /* ============== NAVIGATION ============== */
 
 .navbar {

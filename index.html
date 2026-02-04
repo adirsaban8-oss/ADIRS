@@ -33,6 +33,34 @@
     <!-- בס"ד -->
     <div style="position: fixed; top: 4px; left: 20px; font-size: 14px; font-weight: bold; color: var(--color-text-primary); z-index: 1000;">בס"ד</div>
 
+    <!-- Identity Screen (first visit only) -->
+    <div id="identityOverlay" class="identity-overlay" style="display: none;">
+        <div class="identity-card">
+            <div class="identity-logo">LISHAI SIMANI</div>
+            <h2 class="identity-title">ברוכה הבאה</h2>
+            <p class="identity-subtitle">הפרטים משמשים לזיהוי התור שלך בלבד</p>
+            <form id="identityForm" class="identity-form">
+                <div class="input-group">
+                    <label class="input-label">שם מלא</label>
+                    <input type="text" class="input" id="idName" placeholder="הכניסי את שמך" required>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">טלפון</label>
+                    <input type="tel" class="input" id="idPhone" placeholder="050-0000000" dir="ltr" required>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">אימייל</label>
+                    <input type="email" class="input" id="idEmail" placeholder="your@email.com" dir="ltr" required>
+                </div>
+                <div id="identityError" class="apt-inline-message apt-error" style="display: none;"></div>
+                <button type="submit" class="btn btn-primary btn-full-width btn-lg">
+                    <i class="fas fa-arrow-left"></i>
+                    המשיכי לאתר
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
         <div class="container">
@@ -53,6 +81,11 @@
                 <li><a href="#gallery" class="nav-link">גלריה</a></li>
                 <li><a href="#contact" class="nav-link">צור קשר</a></li>
                 <li><a href="#about" class="nav-link">אודות</a></li>
+                <li id="navIdentityReset" style="display: none;">
+                    <button class="nav-link identity-reset-btn" onclick="UserIdentity.reset()">
+                        <i class="fas fa-sign-out-alt"></i> זה לא אני
+                    </button>
+                </li>
             </ul>
         </div>
     </nav>
@@ -253,22 +286,6 @@
                 <!-- Booking Form -->
                 <div class="booking-form-wrapper">
                     <form class="booking-form" id="bookingForm">
-                        <div class="form-row">
-                            <div class="input-group">
-                                <label class="input-label">שם מלא</label>
-                                <input type="text" class="input" name="name" placeholder="הכניסי את שמך" required>
-                            </div>
-                            <div class="input-group">
-                                <label class="input-label">טלפון</label>
-                                <input type="tel" class="input" name="phone" placeholder="050-0000000" required>
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <label class="input-label">אימייל</label>
-                            <input type="email" class="input" name="email" placeholder="your@email.com" required>
-                        </div>
-
                         <div class="input-group">
                             <label class="input-label">בחרי שירות</label>
                             <select class="input input-select" name="service" required>
@@ -508,16 +525,6 @@
                 <!-- Contact Form -->
                 <div class="contact-form-wrapper">
                     <form class="contact-form" id="contactForm">
-                        <div class="input-group">
-                            <label class="input-label">שם מלא</label>
-                            <input type="text" class="input" name="name" placeholder="הכניסי את שמך" required>
-                        </div>
-
-                        <div class="input-group">
-                            <label class="input-label">טלפון</label>
-                            <input type="tel" class="input" name="phone" placeholder="050-0000000" required>
-                        </div>
-
                         <div class="input-group">
                             <label class="input-label">הודעה</label>
                             <textarea class="input input-textarea" name="message" placeholder="כתבי את הודעתך..." required></textarea>

@@ -24,6 +24,111 @@ const CONFIG = {
     }
 };
 
+// ============== USER IDENTITY ==============
+
+const UserIdentity = {
+    KEYS: {
+        name: 'lishai_user_name',
+        phone: 'lishai_user_phone',
+        email: 'lishai_user_email',
+    },
+
+    get() {
+        const name = localStorage.getItem(this.KEYS.name) || '';
+        const phone = localStorage.getItem(this.KEYS.phone) || '';
+        const email = localStorage.getItem(this.KEYS.email) || '';
+        if (name && phone && email) return { name, phone, email };
+        return null;
+    },
+
+    save(name, phone, email) {
+        localStorage.setItem(this.KEYS.name, name.trim());
+        localStorage.setItem(this.KEYS.phone, phone.trim());
+        localStorage.setItem(this.KEYS.email, email.trim());
+    },
+
+    clear() {
+        localStorage.removeItem(this.KEYS.name);
+        localStorage.removeItem(this.KEYS.phone);
+        localStorage.removeItem(this.KEYS.email);
+    },
+
+    exists() {
+        return !!this.get();
+    },
+
+    reset() {
+        this.clear();
+        location.reload();
+    },
+
+    validate(name, phone, email) {
+        const errors = [];
+        if (!name || name.trim().length < 2) errors.push('נא להזין שם מלא');
+        const phoneClean = (phone || '').replace(/[-\s]/g, '');
+        if (!phoneClean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(phoneClean)) errors.push('נא להזין מספר טלפון תקין');
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('נא להזין כתובת אימייל תקינה');
+        return errors;
+    },
+
+    showOverlay() {
+        const overlay = document.getElementById('identityOverlay');
+        if (overlay) overlay.style.display = 'flex';
+    },
+
+    hideOverlay() {
+        const overlay = document.getElementById('identityOverlay');
+        if (overlay) overlay.style.display = 'none';
+    },
+
+    showResetBtn() {
+        const el = document.getElementById('navIdentityReset');
+        if (el) el.style.display = '';
+    },
+
+    init() {
+        const form = document.getElementById('identityForm');
+
+        if (this.exists()) {
+            this.hideOverlay();
+            this.showResetBtn();
+        } else {
+            this.showOverlay();
+        }
+
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('idName').value;
+                const phone = document.getElementById('idPhone').value;
+                const email = document.getElementById('idEmail').value;
+
+                const errors = this.validate(name, phone, email);
+                const errEl = document.getElementById('identityError');
+
+                if (errors.length > 0) {
+                    if (errEl) {
+                        errEl.textContent = errors.join('. ');
+                        errEl.style.display = '';
+                    }
+                    return;
+                }
+
+                if (errEl) errEl.style.display = 'none';
+                this.save(name, phone, email);
+                this.hideOverlay();
+                this.showResetBtn();
+
+                // Trigger My Appointments auto-lookup
+                MyAppointments.lookupPhone(phone);
+            });
+        }
+    }
+};
+
+// Make reset available globally for onclick
+window.UserIdentity = UserIdentity;
+
 // ============== DOM ELEMENTS ==============
 
 const navbar = document.getElementById('navbar');
@@ -243,14 +348,20 @@ bookingForm.addEventListener('submit', async (e) => {
         return;
     }
 
+    const identity = UserIdentity.get();
+    if (!identity) {
+        UserIdentity.showOverlay();
+        return;
+    }
+
     const formData = new FormData(bookingForm);
     const serviceKey = formData.get('service');
     const serviceInfo = CONFIG.SERVICES[serviceKey];
 
     const bookingData = {
-        name: formData.get('name'),
-        phone: formData.get('phone'),
-        email: formData.get('email'),
+        name: identity.name,
+        phone: identity.phone,
+        email: identity.email,
         service: serviceInfo ? serviceInfo.nameEn : serviceKey,
         date: formData.get('date'),
         time: selectedTimeSlot.dataset.time,
@@ -267,7 +378,7 @@ bookingForm.addEventListener('submit', async (e) => {
     const restrictionMsg = document.getElementById('bookingRestrictionMsg');
     if (restrictionMsg) restrictionMsg.style.display = 'none';
 
-    const existingApt = await MyAppointments.checkBookingRestriction(bookingData.phone);
+    const existingApt = await MyAppointments.checkBookingRestriction(identity.phone);
     if (existingApt) {
         if (restrictionMsg) {
             restrictionMsg.textContent =
@@ -302,7 +413,6 @@ bookingForm.addEventListener('submit', async (e) => {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            MyAppointments.storeUserIdentity(bookingData.phone, bookingData.email);
             showModal({ ...bookingData, serviceKey: serviceKey });
             bookingForm.reset();
             timeSlotsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>';
@@ -330,16 +440,22 @@ bookingForm.addEventListener('submit', async (e) => {
 contactForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const identity = UserIdentity.get();
+    if (!identity) {
+        UserIdentity.showOverlay();
+        return;
+    }
+
     const formData = new FormData(contactForm);
     const contactData = {
-        name: formData.get('name'),
-        phone: formData.get('phone'),
+        name: identity.name,
+        phone: identity.phone,
         message: formData.get('message')
     };
 
     // Validate
-    if (!contactData.name || !contactData.phone || !contactData.message) {
-        alert('נא למלא את כל השדות');
+    if (!contactData.message) {
+        alert('נא לכתוב הודעה');
         return;
     }
 
@@ -486,26 +602,6 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // ============== MY APPOINTMENTS ==============
 
 const MyAppointments = {
-    CACHE_KEY_PHONE: 'lishai_user_phone',
-    CACHE_KEY_EMAIL: 'lishai_user_email',
-
-    getStoredPhone() {
-        return localStorage.getItem(this.CACHE_KEY_PHONE) || '';
-    },
-
-    getStoredEmail() {
-        return localStorage.getItem(this.CACHE_KEY_EMAIL) || '';
-    },
-
-    storeUserIdentity(phone, email) {
-        if (phone) localStorage.setItem(this.CACHE_KEY_PHONE, phone);
-        if (email) localStorage.setItem(this.CACHE_KEY_EMAIL, email);
-    },
-
-    clearUserIdentity() {
-        localStorage.removeItem(this.CACHE_KEY_PHONE);
-        localStorage.removeItem(this.CACHE_KEY_EMAIL);
-    },
 
     async fetchAppointments(phone) {
         const p = phone.trim().replace(/[-\s]/g, '');
@@ -605,7 +701,6 @@ const MyAppointments = {
     },
 
     reset() {
-        this.clearUserIdentity();
         this.showPhoneForm();
         this.hideHomeBubble();
         const input = document.getElementById('aptPhoneInput');
@@ -670,22 +765,11 @@ const MyAppointments = {
         if (resetBtn) resetBtn.addEventListener('click', () => this.reset());
         if (emptyResetBtn) emptyResetBtn.addEventListener('click', () => this.reset());
 
-        // Auto-lookup if phone stored in localStorage
-        const storedPhone = this.getStoredPhone();
-        if (storedPhone) {
-            if (phoneInput) phoneInput.value = storedPhone;
-            this.lookupPhone(storedPhone);
-        }
-
-        // Pre-fill booking form from stored identity
-        const storedEmail = this.getStoredEmail();
-        if (storedPhone) {
-            const phoneField = bookingForm.querySelector('input[name="phone"]');
-            if (phoneField && !phoneField.value) phoneField.value = storedPhone;
-        }
-        if (storedEmail) {
-            const emailField = bookingForm.querySelector('input[name="email"]');
-            if (emailField && !emailField.value) emailField.value = storedEmail;
+        // Auto-lookup if identity exists
+        const identity = UserIdentity.get();
+        if (identity) {
+            if (phoneInput) phoneInput.value = identity.phone;
+            this.lookupPhone(identity.phone);
         }
     }
 };
@@ -697,6 +781,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.hero .fade-in').forEach(el => {
         el.classList.add('visible');
     });
+
+    // Initialize identity system
+    UserIdentity.init();
 
     // Initialize My Appointments
     MyAppointments.init();
