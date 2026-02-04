@@ -31,7 +31,7 @@
 </head>
 <body>
     <!-- בס"ד -->
-    <div style="position: fixed; top: 10px; left: 20px; font-size: 14px; font-weight: bold; color: var(--color-text-primary); z-index: 1000;">בס"ד</div>
+    <div style="position: fixed; top: 4px; left: 20px; font-size: 14px; font-weight: bold; color: var(--color-text-primary); z-index: 1000;">בס"ד</div>
 
     <!-- Navigation -->
     <nav class="navbar" id="navbar">
@@ -564,6 +564,43 @@
             </div>
         </div>
     </div>
+
+    <!-- Gallery Lightbox -->
+    <div id="galleryLightbox" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.92); cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="closeLightbox()">
+        <button onclick="closeLightbox()" style="position:absolute; top:16px; right:16px; z-index:10000; background:none; border:none; color:#fff; font-size:2rem; cursor:pointer; width:44px; height:44px; display:flex; align-items:center; justify-content:center; opacity:0.8;">&times;</button>
+        <img id="lightboxImg" src="" alt="" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); max-width:92vw; max-height:90vh; object-fit:contain; border-radius:8px; cursor:default;" onclick="event.stopPropagation()">
+    </div>
+    <script>
+    function openLightbox(src, alt) {
+        var lb = document.getElementById('galleryLightbox');
+        var img = document.getElementById('lightboxImg');
+        img.src = src;
+        img.alt = alt || '';
+        lb.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        document.getElementById('galleryLightbox').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+    document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeLightbox(); });
+    document.addEventListener('click', function(e) {
+        var item = e.target.closest('.gallery-item');
+        if (item) {
+            var img = item.querySelector('img');
+            if (img) openLightbox(img.src, img.alt);
+        }
+    });
+    (function() {
+        var lb = document.getElementById('galleryLightbox');
+        var startY = 0;
+        lb.addEventListener('touchstart', function(e) { startY = e.touches[0].clientY; }, {passive: true});
+        lb.addEventListener('touchend', function(e) {
+            var dy = e.changedTouches[0].clientY - startY;
+            if (dy > 80) closeLightbox();
+        }, {passive: true});
+    })();
+    </script>
 
     <!-- Scripts -->
     <script src="scripts/main.js"></script>
