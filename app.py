@@ -39,11 +39,48 @@ from email_service import (
 # Import WhatsApp service
 from whatsapp_service import send_whatsapp_booking_confirmation
 
-# Import WhatsApp OTP service
-from whatsapp_otp import request_otp, verify_otp
+# Import WhatsApp OTP service (database version if available, fallback to in-memory)
+try:
+    from db_service import init_db_pool, is_db_available, run_migrations
+    from whatsapp_otp_db import request_otp, verify_otp
+    from customer_service import (
+        customer_exists, get_customer_by_phone, create_customer,
+        get_all_customers, search_customers, get_customer_count
+    )
+    from appointment_service import (
+        create_appointment, get_customer_future_appointments,
+        has_active_future_appointment, cancel_appointment,
+        get_appointments_for_date, update_google_event_id
+    )
+    DB_ENABLED = True
+    print("[Database] Using PostgreSQL database")
+except Exception as db_import_error:
+    print(f"[Database] PostgreSQL not available, using legacy mode: {db_import_error}")
+    from whatsapp_otp import request_otp, verify_otp
+    DB_ENABLED = False
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(32).hex())
+
+# ============== DATABASE INITIALIZATION ==============
+
+if DB_ENABLED:
+    try:
+        db_initialized = init_db_pool()
+        if db_initialized:
+            print("[Database] Connection pool initialized")
+            # Run migrations to ensure tables exist
+            migrations_success = run_migrations()
+            if migrations_success:
+                print("[Database] Migrations completed successfully")
+            else:
+                print("[Database] WARNING: Migrations failed")
+        else:
+            print("[Database] WARNING: Failed to initialize database pool")
+            DB_ENABLED = False
+    except Exception as e:
+        print(f"[Database] Initialization error: {str(e)}")
+        DB_ENABLED = False
 
 # ============== ADMIN CONFIGURATION ==============
 
@@ -491,17 +528,6 @@ def book_appointment():
         except ValueError:
             return jsonify({"error": "Invalid date format"}), 400
 
-        # Check if user already has a future appointment
-        if data.get('phone'):
-            existing = get_appointments_by_phone(data['phone'])
-            if existing:
-                next_apt = existing[0]
-                return jsonify({
-                    "error": f"כבר יש לך תור בתאריך {next_apt['date']} בשעה {next_apt['time']}. "
-                             f"ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.",
-                    "existing_appointment": next_apt
-                }), 409
-
         # Find service details
         service = None
         for s in SERVICES:
@@ -512,38 +538,121 @@ def book_appointment():
         if not service:
             return jsonify({"error": "Invalid service"}), 400
 
-        # Check availability (with error handling)
-        try:
-            is_available = check_availability(data['date'], data['time'], service['duration'])
-            if not is_available:
-                return jsonify({"error": "התור כבר לא פנוי. נא לבחור שעה אחרת."}), 409
-        except Exception as cal_error:
-            print(f"Calendar check error (proceeding anyway): {str(cal_error)}")
-            # Continue with booking even if calendar check fails
+        # ============== DATABASE MODE ==============
+        if DB_ENABLED:
+            # Get or create customer
+            customer = get_customer_by_phone(data['phone'])
+            if not customer:
+                customer = create_customer(data['name'], data['phone'], data['email'])
+                if not customer:
+                    return jsonify({"error": "שגיאה ביצירת משתמש. נסי שוב."}), 500
 
-        # Create booking
-        booking_data = {
-            "name": data['name'],
-            "phone": data['phone'],
-            "email": data['email'],
-            "service": service['name'],
-            "service_he": service['name_he'],
-            "date": data['date'],
-            "time": data['time'],
-            "duration": service['duration'],
-            "notes": data.get('notes', ''),
-        }
+            # Check if customer has active future appointment (BUSINESS RULE)
+            existing_apt = has_active_future_appointment(customer['id'])
+            if existing_apt:
+                apt_datetime = existing_apt['datetime']
+                apt_date_str = apt_datetime.strftime('%d/%m/%Y')
+                apt_time_str = apt_datetime.strftime('%H:%M')
+                return jsonify({
+                    "error": f"כבר יש לך תור בתאריך {apt_date_str} בשעה {apt_time_str}. "
+                             f"ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.",
+                    "existing_appointment": {
+                        "date": apt_date_str,
+                        "time": apt_time_str,
+                        "service": existing_apt['service_name_he']
+                    }
+                }), 409
 
-        # Try to create calendar event
-        event = None
-        try:
-            event = create_event(booking_data)
-            print(f"Calendar event created: {event.get('id') if event else 'N/A'}")
-            # Invalidate appointments cache for this phone
-            _appointments_cache.pop(normalize_phone(data['phone']), None)
-        except Exception as cal_error:
-            print(f"Failed to create calendar event: {str(cal_error)}")
-            # Continue - we'll still send confirmation email
+            # Check availability from Calendar
+            try:
+                is_available = check_availability(data['date'], data['time'], service['duration'])
+                if not is_available:
+                    return jsonify({"error": "התור כבר לא פנוי. נא לבחור שעה אחרת."}), 409
+            except Exception as cal_error:
+                print(f"Calendar check error (proceeding anyway): {str(cal_error)}")
+
+            # Create appointment in database (without Google event ID yet)
+            appointment_db = create_appointment(
+                customer_id=customer['id'],
+                service_name=service['name'],
+                service_name_he=service['name_he'],
+                datetime_str=data['date'],
+                time_str=data['time'],
+                duration=service['duration'],
+                notes=data.get('notes', ''),
+                google_event_id=None
+            )
+
+            if not appointment_db:
+                return jsonify({"error": "שגיאה ביצירת התור במערכת. נסי שוב."}), 500
+
+            # Try to create Google Calendar event
+            booking_data = {
+                "name": data['name'],
+                "phone": data['phone'],
+                "email": data['email'],
+                "service": service['name'],
+                "service_he": service['name_he'],
+                "date": data['date'],
+                "time": data['time'],
+                "duration": service['duration'],
+                "notes": data.get('notes', ''),
+            }
+
+            event = None
+            try:
+                event = create_event(booking_data)
+                if event and event.get('id'):
+                    # Update appointment with Google event ID
+                    update_google_event_id(appointment_db['id'], event['id'])
+                    print(f"Calendar event created: {event['id']}")
+            except Exception as cal_error:
+                print(f"Failed to create calendar event: {str(cal_error)}")
+                # Continue - appointment is saved in database
+
+        # ============== LEGACY MODE (Calendar-only) ==============
+        else:
+            # Check if user already has a future appointment (Calendar-based)
+            if data.get('phone'):
+                existing = get_appointments_by_phone(data['phone'])
+                if existing:
+                    next_apt = existing[0]
+                    return jsonify({
+                        "error": f"כבר יש לך תור בתאריך {next_apt['date']} בשעה {next_apt['time']}. "
+                                 f"ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.",
+                        "existing_appointment": next_apt
+                    }), 409
+
+            # Check availability
+            try:
+                is_available = check_availability(data['date'], data['time'], service['duration'])
+                if not is_available:
+                    return jsonify({"error": "התור כבר לא פנוי. נא לבחור שעה אחרת."}), 409
+            except Exception as cal_error:
+                print(f"Calendar check error (proceeding anyway): {str(cal_error)}")
+
+            # Create booking data
+            booking_data = {
+                "name": data['name'],
+                "phone": data['phone'],
+                "email": data['email'],
+                "service": service['name'],
+                "service_he": service['name_he'],
+                "date": data['date'],
+                "time": data['time'],
+                "duration": service['duration'],
+                "notes": data.get('notes', ''),
+            }
+
+            # Try to create calendar event
+            event = None
+            try:
+                event = create_event(booking_data)
+                print(f"Calendar event created: {event.get('id') if event else 'N/A'}")
+                # Invalidate appointments cache for this phone
+                _appointments_cache.pop(normalize_phone(data['phone']), None)
+            except Exception as cal_error:
+                print(f"Failed to create calendar event: {str(cal_error)}")
 
         # Send confirmation email via SendGrid HTTP API
         email_sent = False
@@ -670,13 +779,24 @@ def otp_verify():
 
 @app.route('/api/user/lookup', methods=['GET'])
 def user_lookup():
-    """Look up user details from Google Calendar by phone number.
-    Returns name and email if found in past/future bookings."""
+    """Look up user details by phone number.
+    Returns name and email if found (from database or Calendar)."""
     phone = request.args.get('phone', '').strip()
 
     if not phone:
         return jsonify({"found": False}), 400
 
+    # Try database first if enabled
+    if DB_ENABLED:
+        customer = get_customer_by_phone(phone)
+        if customer:
+            return jsonify({
+                "found": True,
+                "name": customer['name'],
+                "email": customer['email'],
+            })
+
+    # Fallback to Calendar search (for legacy data)
     phone_norm = normalize_phone(phone)
 
     try:
@@ -728,6 +848,49 @@ def user_lookup():
         return jsonify({"found": False})
 
 
+@app.route('/api/user/register', methods=['POST'])
+def user_register():
+    """Register a new customer after OTP verification.
+    Creates customer in database."""
+    if not DB_ENABLED:
+        return jsonify({"error": "Database not available"}), 503
+
+    data = request.json or {}
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
+    email = data.get('email', '').strip()
+
+    if not name or not phone or not email:
+        return jsonify({"error": "חסרים פרטים"}), 400
+
+    # Check if customer already exists
+    existing = get_customer_by_phone(phone)
+    if existing:
+        return jsonify({
+            "success": False,
+            "error": "מספר זה כבר רשום במערכת",
+            "customer": {
+                "name": existing['name'],
+                "phone": existing['phone'],
+                "email": existing['email']
+            }
+        }), 409
+
+    # Create new customer
+    customer = create_customer(name, phone, email)
+    if not customer:
+        return jsonify({"error": "שגיאה ביצירת משתמש. נסי שוב."}), 500
+
+    return jsonify({
+        "success": True,
+        "customer": {
+            "name": customer['name'],
+            "phone": customer['phone'],
+            "email": customer['email']
+        }
+    })
+
+
 # ============== ADMIN PANEL ==============
 
 @app.route('/admin')
@@ -755,6 +918,46 @@ def admin_logout():
     """Logout admin user."""
     session.pop('admin_authenticated', None)
     return jsonify({"success": True})
+
+
+@app.route('/api/admin/customers', methods=['GET'])
+@admin_required
+def get_admin_customers():
+    """Get all customers for admin panel."""
+    if not DB_ENABLED:
+        return jsonify({"customers": [], "message": "Database not available"}), 503
+
+    # Get pagination parameters
+    limit = int(request.args.get('limit', 50))
+    offset = int(request.args.get('offset', 0))
+    search = request.args.get('search', '').strip()
+
+    try:
+        if search:
+            customers = search_customers(search)
+        else:
+            customers = get_all_customers(limit=limit, offset=offset)
+
+        # Format dates for display
+        for customer in customers:
+            if customer.get('created_at'):
+                created_at = customer['created_at']
+                if isinstance(created_at, str):
+                    created_at = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                customer['created_at_formatted'] = created_at.strftime('%d/%m/%Y')
+
+        total_count = get_customer_count()
+
+        return jsonify({
+            "customers": customers,
+            "total": total_count,
+            "limit": limit,
+            "offset": offset
+        })
+
+    except Exception as e:
+        print(f"Error fetching customers: {str(e)}")
+        return jsonify({"error": "שגיאה בטעינת לקוחות"}), 500
 
 
 @app.route('/api/admin/blocked-slots', methods=['GET'])

@@ -482,6 +482,9 @@
             <button class="admin-tab" data-tab="gallery" onclick="switchTab('gallery')">
                 <i class="fas fa-images"></i> Gallery
             </button>
+            <button class="admin-tab" data-tab="customers" onclick="switchTab('customers')">
+                <i class="fas fa-users"></i> לקוחות
+            </button>
         </div>
 
         <div class="admin-content">
@@ -547,6 +550,42 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Customers Tab -->
+            <div class="tab-content" id="tab-customers">
+                <div class="date-section">
+                    <h2><i class="fas fa-users"></i> רשימת לקוחות</h2>
+                    <div id="customersStatus" class="status-msg"></div>
+
+                    <div class="date-picker-row" style="margin-bottom: 20px;">
+                        <div class="form-group">
+                            <label>חיפוש לקוח</label>
+                            <input type="text" id="customerSearch" placeholder="שם או טלפון..." oninput="searchCustomers()" style="border: 1px solid #2a2a4a; border-radius: 10px; padding: 12px; background: #0f3460; color: #fff; font-family: inherit; width: 100%;">
+                        </div>
+                    </div>
+
+                    <div id="customersTableContainer" style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; background: #0f3460; border-radius: 10px; overflow: hidden;">
+                            <thead>
+                                <tr style="background: #1a2a4e;">
+                                    <th style="padding: 14px; text-align: right; color: #C4A35A; font-weight: 500; border-bottom: 1px solid #2a2a4a;">שם</th>
+                                    <th style="padding: 14px; text-align: right; color: #C4A35A; font-weight: 500; border-bottom: 1px solid #2a2a4a;">טלפון</th>
+                                    <th style="padding: 14px; text-align: right; color: #C4A35A; font-weight: 500; border-bottom: 1px solid #2a2a4a;">תאריך הצטרפות</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customersTableBody">
+                                <tr>
+                                    <td colspan="3" style="padding: 20px; text-align: center; color: #5a5a6a;">
+                                        <i class="fas fa-spinner fa-spin"></i> טוען לקוחות...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="customersCount" style="margin-top: 16px; text-align: center; color: #8a8a9a; font-size: 0.9rem;"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -571,6 +610,7 @@
                 document.getElementById('adminPanel').style.display = 'block';
                 loadBlockedDates();
                 loadGallery();
+                loadCustomers();
             } else {
                 errorEl.textContent = 'Incorrect password';
                 errorEl.style.display = 'block';
@@ -846,6 +886,103 @@
         } catch (err) {
             showStatus('galleryStatus', 'Delete failed', 'error');
         }
+    }
+
+    // ============== CUSTOMERS ==============
+
+    let searchTimeout = null;
+
+    async function loadCustomers() {
+        const tbody = document.getElementById('customersTableBody');
+        const countEl = document.getElementById('customersCount');
+
+        try {
+            const res = await fetch('/api/admin/customers');
+            if (!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #ff6b6b;">שגיאה בטעינת לקוחות</td></tr>';
+                return;
+            }
+
+            const data = await res.json();
+            const customers = data.customers || [];
+
+            if (customers.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #8a8a9a;">אין לקוחות רשומים</td></tr>';
+                countEl.textContent = '';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            customers.forEach(customer => {
+                const row = document.createElement('tr');
+                row.style.borderBottom = '1px solid #1a2a4e';
+                row.innerHTML = `
+                    <td style="padding: 14px; color: #e0e0e0;">${escapeHtml(customer.name)}</td>
+                    <td style="padding: 14px; color: #e0e0e0; direction: ltr; text-align: right;">${escapeHtml(customer.phone)}</td>
+                    <td style="padding: 14px; color: #8a8a9a;">${customer.created_at_formatted || ''}</td>
+                `;
+                tbody.appendChild(row);
+            });
+
+            countEl.textContent = `סה"כ ${data.total} לקוחות`;
+
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #ff6b6b;">שגיאה בטעינת לקוחות</td></tr>';
+        }
+    }
+
+    async function searchCustomers() {
+        const searchTerm = document.getElementById('customerSearch').value.trim();
+
+        // Debounce search
+        if (searchTimeout) clearTimeout(searchTimeout);
+
+        searchTimeout = setTimeout(async () => {
+            const tbody = document.getElementById('customersTableBody');
+            const countEl = document.getElementById('customersCount');
+
+            if (!searchTerm) {
+                loadCustomers();
+                return;
+            }
+
+            tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #8a8a9a;"><i class="fas fa-spinner fa-spin"></i> מחפש...</td></tr>';
+
+            try {
+                const res = await fetch(`/api/admin/customers?search=${encodeURIComponent(searchTerm)}`);
+                const data = await res.json();
+                const customers = data.customers || [];
+
+                if (customers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #8a8a9a;">לא נמצאו לקוחות</td></tr>';
+                    countEl.textContent = '';
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                customers.forEach(customer => {
+                    const row = document.createElement('tr');
+                    row.style.borderBottom = '1px solid #1a2a4e';
+                    row.innerHTML = `
+                        <td style="padding: 14px; color: #e0e0e0;">${escapeHtml(customer.name)}</td>
+                        <td style="padding: 14px; color: #e0e0e0; direction: ltr; text-align: right;">${escapeHtml(customer.phone)}</td>
+                        <td style="padding: 14px; color: #8a8a9a;">${customer.created_at_formatted || ''}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                countEl.textContent = `נמצאו ${customers.length} לקוחות`;
+
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="3" style="padding: 20px; text-align: center; color: #ff6b6b;">שגיאה בחיפוש</td></tr>';
+            }
+        }, 300);
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // ============== DRAG AND DROP ==============

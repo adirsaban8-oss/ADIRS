@@ -854,7 +854,16 @@ function showModal(booking) {
 
             detailsEl.innerHTML =
                 `<p><strong>${serviceName}</strong></p>` +
-                `<p>${formattedDate} | ${booking.time}</p>`;
+                `<p>${formattedDate} | ${booking.time}</p>` +
+                `<div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(196, 163, 90, 0.2);">` +
+                    `<p style="color: var(--color-text-secondary); font-size: 0.9rem; margin-bottom: 0.75rem;">הגעה לסטודיו:</p>` +
+                    `<a href="waze://?q=${encodeURIComponent(BUSINESS_ADDRESS)}" ` +
+                       `onclick="event.preventDefault(); window.location.href='waze://?q=${encodeURIComponent(BUSINESS_ADDRESS)}'; ` +
+                       `setTimeout(function(){ window.location.href='https://www.waze.com/ul?q=${encodeURIComponent(BUSINESS_ADDRESS)}'; }, 500);" ` +
+                       `class="btn btn-outline" style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.95rem;">` +
+                        `<i class="fas fa-route"></i> נווט עם Waze` +
+                    `</a>` +
+                `</div>`;
         }
 
         // WhatsApp confirmation is sent automatically from the backend
@@ -1096,6 +1105,79 @@ const MyAppointments = {
     }
 };
 
+// ============== HOME PERSONALIZATION ==============
+
+function initializeHomeGreeting() {
+    const identity = UserIdentity.get();
+    if (!identity || !identity.name) return;
+
+    // Find hero title and add greeting
+    const heroContent = document.querySelector('.hero-content');
+    if (!heroContent) return;
+
+    // Check if greeting already exists
+    if (document.getElementById('personalizedGreeting')) return;
+
+    // Create greeting element
+    const greetingDiv = document.createElement('div');
+    greetingDiv.id = 'personalizedGreeting';
+    greetingDiv.style.cssText = `
+        margin-bottom: 1.5rem;
+        text-align: center;
+        color: var(--color-gold);
+        font-size: 1.3rem;
+        font-family: var(--font-hebrew-heading);
+        font-weight: 300;
+        letter-spacing: 0.05em;
+        animation: fadeIn 0.8s ease-out;
+    `;
+
+    const firstName = identity.name.split(' ')[0];
+    greetingDiv.textContent = `שלום, ${firstName}! 👋`;
+
+    // Insert after hero-badge
+    const heroBadge = heroContent.querySelector('.hero-badge');
+    if (heroBadge && heroBadge.nextSibling) {
+        heroContent.insertBefore(greetingDiv, heroBadge.nextSibling);
+    } else {
+        heroContent.insertBefore(greetingDiv, heroContent.firstChild);
+    }
+}
+
+// ============== WAZE NAVIGATION ==============
+
+const BUSINESS_ADDRESS = 'משעול הרקפת 3 קרני שומרון';
+
+function addWazeButton(containerElement) {
+    if (!containerElement) return;
+
+    // Check if Waze button already exists
+    if (containerElement.querySelector('.waze-button')) return;
+
+    const wazeBtn = document.createElement('a');
+    wazeBtn.className = 'waze-button btn btn-outline btn-lg';
+    wazeBtn.style.cssText = `
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 1rem;
+    `;
+
+    wazeBtn.href = `waze://?q=${encodeURIComponent(BUSINESS_ADDRESS)}`;
+
+    // Deep link with fallback to Waze web
+    wazeBtn.onclick = function(e) {
+        e.preventDefault();
+        window.location.href = `waze://?q=${encodeURIComponent(BUSINESS_ADDRESS)}`;
+        setTimeout(() => {
+            window.location.href = `https://www.waze.com/ul?q=${encodeURIComponent(BUSINESS_ADDRESS)}`;
+        }, 500);
+    };
+
+    wazeBtn.innerHTML = '<i class="fas fa-route"></i> נווט עם Waze';
+    containerElement.appendChild(wazeBtn);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     console.log('LISHAI SIMANI Beauty Studio - Website Loaded');
 
@@ -1109,6 +1191,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize My Appointments
     MyAppointments.init();
+
+    // Initialize Home Personalization
+    initializeHomeGreeting();
 });
 
 // Make closeModal available globally
