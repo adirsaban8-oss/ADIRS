@@ -3,6 +3,61 @@
    Main JavaScript
    ======================================== */
 
+// ============== PHONE UTILITIES ==============
+// Centralized phone normalization to E.164 format (+972XXXXXXXXX)
+
+const PhoneUtils = {
+    /**
+     * Normalize any Israeli phone number to E.164 format (+972XXXXXXXXX).
+     */
+    normalize(phone) {
+        if (!phone) return null;
+        let clean = String(phone).replace(/[^\d+]/g, '');
+        if (clean.startsWith('+')) clean = clean.substring(1);
+
+        if (clean.startsWith('972') && clean.length === 12) return '+' + clean;
+        if (clean.startsWith('0') && clean.length === 10) return '+972' + clean.substring(1);
+        if (clean.startsWith('5') && clean.length === 9) return '+972' + clean;
+
+        return null;
+    },
+
+    /**
+     * Check if a phone number is a valid Israeli mobile number.
+     */
+    isValid(phone) {
+        const normalized = this.normalize(phone);
+        if (!normalized) return false;
+        const prefix = normalized.substring(4, 6);
+        return ['50', '51', '52', '53', '54', '55', '58'].includes(prefix);
+    },
+
+    /**
+     * Format phone for local Israeli display: 050-123-4567
+     */
+    formatLocal(phone) {
+        const normalized = this.normalize(phone);
+        if (!normalized) return phone || '';
+        const digits = normalized.substring(4);
+        if (digits.length === 9) {
+            return '0' + digits.substring(0, 2) + '-' + digits.substring(2, 5) + '-' + digits.substring(5);
+        }
+        return normalized;
+    },
+
+    /**
+     * Get validation error message in Hebrew, or null if valid.
+     */
+    getValidationError(phone) {
+        if (!phone || !phone.trim()) return 'נא להזין מספר טלפון';
+        if (!this.normalize(phone)) return 'מספר טלפון לא תקין. נא להזין מספר ישראלי';
+        if (!this.isValid(phone)) return 'נא להזין מספר טלפון נייד ישראלי תקין';
+        return null;
+    }
+};
+
+window.PhoneUtils = PhoneUtils;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize all components
     initNavbar();
@@ -245,10 +300,22 @@ function initBookingForm() {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח...';
 
-        // Collect form data
+        // Collect form data with phone normalization
+        const rawPhone = form.querySelector('#bookingPhone').value;
+        const normalizedPhone = PhoneUtils.normalize(rawPhone);
+
+        // Validate phone
+        const phoneError = PhoneUtils.getValidationError(rawPhone);
+        if (phoneError) {
+            showNotification(phoneError, 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            return;
+        }
+
         const formData = {
             name: form.querySelector('#bookingName').value,
-            phone: form.querySelector('#bookingPhone').value,
+            phone: normalizedPhone,
             email: form.querySelector('#bookingEmail').value,
             service: form.querySelector('#bookingService').value,
             date: form.querySelector('#bookingDate').value,
@@ -307,10 +374,22 @@ function initContactForm() {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> שולח...';
 
-        // Collect form data
+        // Collect form data with phone normalization
+        const rawPhone = form.querySelector('#contactPhone').value;
+        const normalizedPhone = PhoneUtils.normalize(rawPhone);
+
+        // Validate phone
+        const phoneError = PhoneUtils.getValidationError(rawPhone);
+        if (phoneError) {
+            showNotification(phoneError, 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            return;
+        }
+
         const formData = {
             name: form.querySelector('#contactName').value,
-            phone: form.querySelector('#contactPhone').value,
+            phone: normalizedPhone,
             message: form.querySelector('#contactMessage').value
         };
 

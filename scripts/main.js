@@ -24,6 +24,118 @@ const CONFIG = {
     }
 };
 
+// ============== PHONE UTILITIES ==============
+// Centralized phone normalization to E.164 format (+972XXXXXXXXX)
+// Ensures all phone numbers sent to backend are in correct format for Twilio
+
+const PhoneUtils = {
+    /**
+     * Normalize any Israeli phone number to E.164 format (+972XXXXXXXXX).
+     *
+     * Accepts:
+     *   - 0501234567      -> +972501234567
+     *   - 050-123-4567    -> +972501234567
+     *   - 050 123 4567    -> +972501234567
+     *   - 972501234567    -> +972501234567
+     *   - +972501234567   -> +972501234567
+     *   - +972-50-123-4567 -> +972501234567
+     *
+     * @param {string} phone - Phone number in any format
+     * @returns {string|null} - Phone in +972XXXXXXXXX format, or null if invalid
+     */
+    normalize(phone) {
+        if (!phone) return null;
+
+        // Remove all non-digit characters except leading +
+        let clean = String(phone).replace(/[^\d+]/g, '');
+
+        // Remove leading + for processing
+        if (clean.startsWith('+')) {
+            clean = clean.substring(1);
+        }
+
+        // Case 1: Already has 972 prefix (12 digits)
+        if (clean.startsWith('972')) {
+            if (clean.length === 12) {
+                return '+' + clean;
+            }
+            return null;
+        }
+
+        // Case 2: Israeli local format (starts with 0, 10 digits)
+        if (clean.startsWith('0') && clean.length === 10) {
+            return '+972' + clean.substring(1);
+        }
+
+        // Case 3: Israeli format without leading 0 (9 digits, starts with 5)
+        if (clean.startsWith('5') && clean.length === 9) {
+            return '+972' + clean;
+        }
+
+        return null;
+    },
+
+    /**
+     * Check if a phone number is a valid Israeli mobile number.
+     * Israeli mobile prefixes: 050, 051, 052, 053, 054, 055, 058
+     *
+     * @param {string} phone - Phone number in any format
+     * @returns {boolean} - True if valid Israeli mobile number
+     */
+    isValid(phone) {
+        const normalized = this.normalize(phone);
+        if (!normalized) return false;
+
+        // Check Israeli mobile prefixes (after +972)
+        const prefix = normalized.substring(4, 6);
+        const mobilePrefixes = ['50', '51', '52', '53', '54', '55', '58'];
+        return mobilePrefixes.includes(prefix);
+    },
+
+    /**
+     * Format phone for local Israeli display: 050-123-4567
+     *
+     * @param {string} phone - Phone in any format
+     * @returns {string} - Formatted for display
+     */
+    formatLocal(phone) {
+        const normalized = this.normalize(phone);
+        if (!normalized) return phone || '';
+
+        const digits = normalized.substring(4); // Remove +972
+        if (digits.length === 9) {
+            return '0' + digits.substring(0, 2) + '-' + digits.substring(2, 5) + '-' + digits.substring(5);
+        }
+        return normalized;
+    },
+
+    /**
+     * Get validation error message in Hebrew, or null if valid.
+     *
+     * @param {string} phone - Phone number to validate
+     * @returns {string|null} - Error message in Hebrew, or null if valid
+     */
+    getValidationError(phone) {
+        if (!phone || !phone.trim()) {
+            return 'נא להזין מספר טלפון';
+        }
+
+        const normalized = this.normalize(phone);
+        if (!normalized) {
+            return 'מספר טלפון לא תקין. נא להזין מספר ישראלי (למשל 050-1234567)';
+        }
+
+        if (!this.isValid(phone)) {
+            return 'נא להזין מספר טלפון נייד ישראלי תקין';
+        }
+
+        return null;
+    }
+};
+
+// Make PhoneUtils available globally
+window.PhoneUtils = PhoneUtils;
+
 // ============== USER IDENTITY ==============
 
 const UserIdentity = {
@@ -49,8 +161,10 @@ const UserIdentity = {
     },
 
     save(name, phone, email) {
+        // Always store phone in normalized +972 format
+        const normalizedPhone = PhoneUtils.normalize(phone) || phone.trim();
         localStorage.setItem(this.KEYS.name, name.trim());
-        localStorage.setItem(this.KEYS.phone, phone.trim());
+        localStorage.setItem(this.KEYS.phone, normalizedPhone);
         localStorage.setItem(this.KEYS.email, email.trim());
     },
 
@@ -70,11 +184,14 @@ const UserIdentity = {
     },
 
     validatePhone(phone) {
-        const clean = (phone || '').replace(/[-\s]/g, '');
-        if (!clean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(clean)) {
-            return 'נא להזין מספר טלפון תקין';
-        }
-        return null;
+        return PhoneUtils.getValidationError(phone);
+    },
+
+    /**
+     * Normalize phone to E.164 format before storage/submission.
+     */
+    normalizePhone(phone) {
+        return PhoneUtils.normalize(phone);
     },
 
     showOverlay() {
@@ -127,6 +244,13 @@ const UserIdentity = {
         if (err) { this.showError('idStep1Error', err); return; }
         this.hideError('idStep1Error');
 
+        // Normalize to +972 format before sending to backend
+        const normalizedPhone = PhoneUtils.normalize(phone);
+        if (!normalizedPhone) {
+            this.showError('idStep1Error', 'מספר טלפון לא תקין');
+            return;
+        }
+
         const btn = document.getElementById('idSendOtpBtn');
         this.setButtonLoading(btn, true);
 
@@ -134,7 +258,7 @@ const UserIdentity = {
             const res = await fetch(CONFIG.API_BASE + '/api/otp/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: phone })
+                body: JSON.stringify({ phone: normalizedPhone })
             });
             const data = await res.json();
 
@@ -143,7 +267,7 @@ const UserIdentity = {
                 return;
             }
 
-            this._pendingPhone = phone;
+            this._pendingPhone = normalizedPhone;
             this._isNewCustomer = false;
 
             if (data.mock) {
@@ -151,7 +275,8 @@ const UserIdentity = {
             }
 
             this.showStep(2);
-            document.getElementById('idOtpPhone').textContent = phone;
+            // Display user-friendly local format
+            document.getElementById('idOtpPhone').textContent = PhoneUtils.formatLocal(normalizedPhone);
             this._initOtpBoxes();
             this._startResendTimer();
 
@@ -177,6 +302,13 @@ const UserIdentity = {
         }
         this.hideError('idStep1bError');
 
+        // Normalize to +972 format before sending to backend
+        const normalizedPhone = PhoneUtils.normalize(phone);
+        if (!normalizedPhone) {
+            this.showError('idStep1bError', 'מספר טלפון לא תקין');
+            return;
+        }
+
         const btn = document.getElementById('idRegSendOtpBtn');
         this.setButtonLoading(btn, true);
 
@@ -184,7 +316,7 @@ const UserIdentity = {
             const res = await fetch(CONFIG.API_BASE + '/api/otp/request', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone: phone })
+                body: JSON.stringify({ phone: normalizedPhone })
             });
             const data = await res.json();
 
@@ -193,7 +325,7 @@ const UserIdentity = {
                 return;
             }
 
-            this._pendingPhone = phone;
+            this._pendingPhone = normalizedPhone;
             this._pendingName = name;
             this._pendingEmail = email;
             this._isNewCustomer = true;
@@ -203,7 +335,8 @@ const UserIdentity = {
             }
 
             this.showStep(2);
-            document.getElementById('idOtpPhone').textContent = phone;
+            // Display user-friendly local format
+            document.getElementById('idOtpPhone').textContent = PhoneUtils.formatLocal(normalizedPhone);
             this._initOtpBoxes();
             this._startResendTimer();
 
@@ -935,9 +1068,10 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 const MyAppointments = {
 
     async fetchAppointments(phone) {
-        const p = phone.trim().replace(/[-\s]/g, '');
+        // Normalize to +972 format for backend
+        const normalizedPhone = PhoneUtils.normalize(phone) || phone.trim().replace(/[-\s]/g, '');
         const response = await fetch(
-            `${CONFIG.API_BASE}/api/my-appointments?phone=${encodeURIComponent(p)}`
+            `${CONFIG.API_BASE}/api/my-appointments?phone=${encodeURIComponent(normalizedPhone)}`
         );
         if (!response.ok) {
             const err = await response.json();
@@ -1005,23 +1139,33 @@ const MyAppointments = {
     },
 
     async lookupPhone(phone) {
-        if (!phone || phone.replace(/[-\s]/g, '').length < 9) {
-            this.showPhoneError('נא להזין מספר טלפון תקין');
+        // Validate phone using PhoneUtils
+        const validationError = PhoneUtils.getValidationError(phone);
+        if (validationError) {
+            this.showPhoneError(validationError);
+            return;
+        }
+
+        // Normalize to +972 format
+        const normalizedPhone = PhoneUtils.normalize(phone);
+        if (!normalizedPhone) {
+            this.showPhoneError('מספר טלפון לא תקין');
             return;
         }
 
         this.hidePhoneError();
-        this.storeUserIdentity(phone);
+        this.storeUserIdentity(normalizedPhone);
         this.showLoading();
 
         try {
-            const data = await this.fetchAppointments(phone);
+            const data = await this.fetchAppointments(normalizedPhone);
+            const displayPhone = PhoneUtils.formatLocal(normalizedPhone);
 
             if (data.appointments && data.appointments.length > 0) {
-                this.showResults(phone, data.appointments);
+                this.showResults(displayPhone, data.appointments);
                 this.updateHomeBubble(data.appointments[0]);
             } else {
-                this.showEmpty(phone);
+                this.showEmpty(displayPhone);
                 this.hideHomeBubble();
             }
         } catch (err) {
@@ -1099,7 +1243,8 @@ const MyAppointments = {
         // Auto-lookup if identity exists
         const identity = UserIdentity.get();
         if (identity) {
-            if (phoneInput) phoneInput.value = identity.phone;
+            // Display in user-friendly local format
+            if (phoneInput) phoneInput.value = PhoneUtils.formatLocal(identity.phone);
             this.lookupPhone(identity.phone);
         }
     }
