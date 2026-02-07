@@ -120,16 +120,27 @@ const PhoneUtils = {
             return 'נא להזין מספר טלפון';
         }
 
+        // Normalize first, then validate the normalized value
         const normalized = this.normalize(phone);
         if (!normalized) {
             return 'מספר טלפון לא תקין. נא להזין מספר ישראלי (למשל 050-1234567)';
         }
 
-        if (!this.isValid(phone)) {
+        // Validate the NORMALIZED phone, not the raw input
+        if (!this.isValidNormalized(normalized)) {
             return 'נא להזין מספר טלפון נייד ישראלי תקין';
         }
 
         return null;
+    },
+
+    /**
+     * Check if a normalized phone (+972XXXXXXXXX) is a valid Israeli mobile.
+     */
+    isValidNormalized(normalizedPhone) {
+        if (!normalizedPhone || !normalizedPhone.startsWith('+972')) return false;
+        const prefix = normalizedPhone.substring(4, 6);
+        return ['50', '51', '52', '53', '54', '55', '58'].includes(prefix);
     }
 };
 
