@@ -1,12 +1,24 @@
 """
 LISHAI SIMANI Beauty Studio - Flask Server for Railway
 Serves the static HTML/CSS/JS website and provides booking API
+
+IMPORTANT - GUNICORN/RAILWAY COMPATIBILITY:
+============================================
+All module-level initialization (database, services, etc.) happens at import time.
+This is REQUIRED because:
+1. Gunicorn imports this module but does NOT execute `if __name__ == "__main__"` blocks
+2. Each Gunicorn worker spawns a new process that imports this module
+3. Database connections, schedulers, and services must be ready before handling requests
+4. Railway uses Gunicorn in production via: gunicorn app:app
+
+DO NOT move initialization code into __main__ blocks or it will break in production.
 """
 
 from flask import Flask, render_template, request, jsonify, send_from_directory, session, redirect
 from datetime import datetime, timedelta, date
 from functools import wraps
 import os
+import sys
 import json
 import threading
 from werkzeug.utils import secure_filename
@@ -15,7 +27,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import pytz
 
-# Load environment variables
+# Load environment variables FIRST - before any other imports that might need them
 load_dotenv()
 
 # Import calendar service
@@ -76,24 +88,33 @@ app = Flask(__name__, static_folder='.', static_url_path='')
 app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(32).hex())
 
 # ============== DATABASE INITIALIZATION ==============
+# CRITICAL: This block runs at MODULE IMPORT TIME (not in __main__)
+# This is REQUIRED for Gunicorn/Railway compatibility.
+# Gunicorn workers import this module and need the DB pool ready immediately.
 
 if DB_ENABLED:
     try:
+        print("[Database] Initializing connection pool at module load...", file=sys.stderr)
         db_initialized = init_db_pool()
         if db_initialized:
-            print("[Database] Connection pool initialized")
+            print("[Database] Connection pool initialized successfully")
             # Run migrations to ensure tables exist
             migrations_success = run_migrations()
             if migrations_success:
                 print("[Database] Migrations completed successfully")
             else:
-                print("[Database] WARNING: Migrations failed")
+                print("[Database] WARNING: Migrations failed", file=sys.stderr)
         else:
-            print("[Database] WARNING: Failed to initialize database pool")
+            print("[Database] WARNING: Failed to initialize database pool", file=sys.stderr)
             DB_ENABLED = False
     except Exception as e:
-        print(f"[Database] Initialization error: {str(e)}")
+        print(f"[Database] CRITICAL: Initialization error: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         DB_ENABLED = False
+
+# Log final database status
+print(f"[Database] Final status: DB_ENABLED={DB_ENABLED}")
 
 # ============== ADMIN CONFIGURATION ==============
 

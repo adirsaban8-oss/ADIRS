@@ -1,46 +1,90 @@
 """
 Database Service - LISHAI SIMANI Beauty Studio
 PostgreSQL connection handling and common database operations
+
+IMPORTANT: Database pool initialization MUST happen at module-level (global scope)
+in app.py, NOT inside `if __name__ == "__main__"`. This is required because:
+- Gunicorn imports the app module but doesn't execute __main__ blocks
+- Railway runs the app via Gunicorn in production
+- Each Gunicorn worker process needs its own connection pool
+- The pool must be ready BEFORE any route or service tries to use the database
 """
 
 import os
+import sys
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import SimpleConnectionPool
 import logging
 from contextlib import contextmanager
+import threading
 
 logger = logging.getLogger(__name__)
 
-# Connection pool
+# Connection pool - initialized once per process
 _connection_pool = None
+_pool_lock = threading.Lock()
+_pool_initialized = False
 
 
 def init_db_pool():
-    """Initialize the database connection pool."""
-    global _connection_pool
+    """
+    Initialize the database connection pool.
 
-    database_url = os.getenv('DATABASE_URL')
+    This function is IDEMPOTENT - safe to call multiple times.
+    Uses a lock to prevent race conditions in multi-threaded environments.
+    Must be called at module-level in app.py for Gunicorn compatibility.
+    """
+    global _connection_pool, _pool_initialized
 
-    if not database_url:
-        logger.warning("DATABASE_URL not set. Database features will be disabled.")
-        return False
-
-    try:
-        # Railway and some providers use postgres:// but psycopg2 needs postgresql://
-        if database_url.startswith('postgres://'):
-            database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-        _connection_pool = SimpleConnectionPool(
-            minconn=1,
-            maxconn=10,
-            dsn=database_url
-        )
-        logger.info("Database connection pool initialized successfully")
+    # Fast path: already initialized
+    if _pool_initialized and _connection_pool is not None:
         return True
-    except Exception as e:
-        logger.error(f"Failed to initialize database pool: {str(e)}")
-        return False
+
+    with _pool_lock:
+        # Double-check after acquiring lock
+        if _pool_initialized and _connection_pool is not None:
+            return True
+
+        database_url = os.getenv('DATABASE_URL')
+
+        if not database_url:
+            logger.warning("DATABASE_URL not set. Database features will be disabled.")
+            print("[Database] WARNING: DATABASE_URL not set", file=sys.stderr)
+            return False
+
+        try:
+            # Railway and some providers use postgres:// but psycopg2 needs postgresql://
+            if database_url.startswith('postgres://'):
+                database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+            _connection_pool = SimpleConnectionPool(
+                minconn=1,
+                maxconn=10,
+                dsn=database_url
+            )
+            _pool_initialized = True
+            logger.info("Database connection pool initialized successfully")
+            print("[Database] Connection pool initialized successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize database pool: {str(e)}")
+            print(f"[Database] ERROR: Failed to initialize pool: {str(e)}", file=sys.stderr)
+            return False
+
+
+def ensure_pool_initialized():
+    """
+    Ensure the database pool is initialized.
+    Called automatically by get_db_connection if pool is not ready.
+    """
+    global _connection_pool, _pool_initialized
+
+    if _pool_initialized and _connection_pool is not None:
+        return True
+
+    # Attempt to initialize if not done yet
+    return init_db_pool()
 
 
 @contextmanager
@@ -48,7 +92,16 @@ def get_db_connection():
     """
     Context manager for database connections.
     Automatically returns connection to pool when done.
+    Will attempt to initialize pool if not already done.
     """
+    # Ensure pool is ready before attempting to get connection
+    if not _connection_pool:
+        if not ensure_pool_initialized():
+            raise Exception(
+                "Database pool not initialized and auto-initialization failed. "
+                "Check DATABASE_URL environment variable."
+            )
+
     if not _connection_pool:
         raise Exception("Database pool not initialized. Call init_db_pool() first.")
 
