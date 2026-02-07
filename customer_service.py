@@ -1,31 +1,23 @@
 """
 Customer Service - LISHAI SIMANI Beauty Studio
 Handles customer registration, lookup, and management in PostgreSQL
+
+NOTE: All phone numbers are stored in E.164 format (+972XXXXXXXXX)
 """
 
 import logging
 from db_service import execute_query
+from phone_utils import normalize_israeli_phone
 
 logger = logging.getLogger(__name__)
 
 
 def normalize_phone(phone):
-    """Normalize phone number for consistent storage and comparison."""
-    if not phone:
-        return None
-    clean = phone.strip().replace('-', '').replace(' ', '').replace('(', '').replace(')', '')
-
-    # Convert to Israeli format: 0XXXXXXXXX
-    if clean.startswith('+972'):
-        clean = '0' + clean[4:]
-    elif clean.startswith('972') and len(clean) > 10:
-        clean = '0' + clean[3:]
-
-    # Validate Israeli phone format
-    if clean.startswith('0') and len(clean) == 10:
-        return clean
-
-    return None
+    """
+    Normalize phone number to E.164 format (+972XXXXXXXXX).
+    Wrapper for centralized phone_utils.normalize_israeli_phone.
+    """
+    return normalize_israeli_phone(phone)
 
 
 def customer_exists(phone):

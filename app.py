@@ -48,6 +48,9 @@ from email_service import (
     send_email
 )
 
+# Import phone utilities (centralized E.164 normalization)
+from phone_utils import normalize_israeli_phone
+
 # Import Twilio SMS service
 try:
     from twilio_sms_service import (
@@ -215,13 +218,11 @@ APPOINTMENTS_CACHE_TTL = 300  # 5 minutes
 
 
 def normalize_phone(phone):
-    """Normalize phone number for consistent comparison."""
-    p = phone.strip().replace('-', '').replace(' ', '')
-    if p.startswith('+972'):
-        p = '0' + p[4:]
-    elif p.startswith('972') and len(p) > 10:
-        p = '0' + p[3:]
-    return p
+    """
+    Normalize phone number to E.164 format (+972XXXXXXXXX).
+    Uses centralized phone_utils for consistency across the app.
+    """
+    return normalize_israeli_phone(phone) or phone
 
 
 def get_appointments_by_phone(phone):

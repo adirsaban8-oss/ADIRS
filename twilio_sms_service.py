@@ -1,12 +1,15 @@
 """
 Twilio SMS Notification Service - LISHAI SIMANI Beauty Studio
 Handles sending booking confirmations and reminders via Twilio SMS.
+
+NOTE: All phone numbers use E.164 format (+972XXXXXXXXX)
 """
 
 import os
 import logging
 import sys
 from datetime import datetime
+from phone_utils import normalize_israeli_phone
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -27,26 +30,12 @@ BUSINESS_ADDRESS = "משעול הרקפת 3, קרני שומרון"
 BUSINESS_PHONE = "051-5656295"
 
 
-def normalize_phone_for_sms(phone):
+def normalize_phone(phone):
     """
-    Normalize Israeli phone to international format (+972XXXXXXXXX).
+    Normalize phone to E.164 format (+972XXXXXXXXX).
+    Wrapper for centralized phone_utils.normalize_israeli_phone.
     """
-    if not phone:
-        return None
-    clean = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-
-    if clean.startswith("+"):
-        clean = clean[1:]
-
-    if clean.startswith("972"):
-        if len(clean) == 12:
-            return "+" + clean
-        return None
-
-    if clean.startswith("0") and len(clean) == 10:
-        return "+972" + clean[1:]
-
-    return None
+    return normalize_israeli_phone(phone)
 
 
 def _send_sms(phone, message_body):
@@ -60,7 +49,7 @@ def _send_sms(phone, message_body):
     Returns:
         True if sent successfully, False otherwise
     """
-    phone_intl = normalize_phone_for_sms(phone)
+    phone_intl = normalize_phone(phone)
 
     if not TWILIO_ENABLED:
         logger.info("[Twilio][SMS] MOCK MODE - Would send to %s: %s", phone, message_body[:50])

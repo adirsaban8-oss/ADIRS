@@ -2,6 +2,8 @@
 Twilio SMS OTP Service - LISHAI SIMANI Beauty Studio
 Handles OTP generation, storage in PostgreSQL, verification, and sending via Twilio SMS.
 When TWILIO_ENABLED=false or credentials missing, operates in mock mode (logs only).
+
+NOTE: All phone numbers are stored and sent in E.164 format (+972XXXXXXXXX)
 """
 
 import os
@@ -11,6 +13,7 @@ import logging
 import sys
 from datetime import datetime, timedelta
 from db_service import execute_query
+from phone_utils import normalize_israeli_phone
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -33,49 +36,12 @@ OTP_MAX_ATTEMPTS = 3
 OTP_COOLDOWN_MINUTES = 15
 
 
-def normalize_phone_for_sms(phone):
+def normalize_phone(phone):
     """
-    Normalize Israeli phone to international format (+972XXXXXXXXX).
-    Accepts: 0501234567, 050-1234567, +972501234567, 972501234567
+    Normalize phone to E.164 format (+972XXXXXXXXX).
+    Used for both storage and SMS sending.
     """
-    if not phone:
-        return None
-    clean = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
-
-    # Remove + if present
-    if clean.startswith("+"):
-        clean = clean[1:]
-
-    # Already in 972 format
-    if clean.startswith("972"):
-        if len(clean) == 12:
-            return "+" + clean
-        return None
-
-    # Israeli format 0XXXXXXXXX
-    if clean.startswith("0") and len(clean) == 10:
-        return "+972" + clean[1:]
-
-    return None
-
-
-def normalize_phone_for_storage(phone):
-    """
-    Normalize phone for database storage (0XXXXXXXXX format).
-    """
-    if not phone:
-        return None
-    clean = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "").replace("+", "")
-
-    # From 972 format to 0 format
-    if clean.startswith("972") and len(clean) == 12:
-        return "0" + clean[3:]
-
-    # Already in 0 format
-    if clean.startswith("0") and len(clean) == 10:
-        return clean
-
-    return None
+    return normalize_israeli_phone(phone)
 
 
 # ============== OTP GENERATION & STORAGE ==============
@@ -93,7 +59,7 @@ def request_otp(phone):
     Returns:
         dict with keys: success (bool), error (str or None), mock (bool)
     """
-    phone_storage = normalize_phone_for_storage(phone)
+    phone_storage = normalize_phone(phone)
     if not phone_storage:
         logger.warning("[Twilio][OTP] Invalid phone number: %s", phone)
         return {"success": False, "error": "מספר טלפון לא תקין"}
@@ -162,7 +128,7 @@ def verify_otp(phone, code):
     Returns:
         dict with keys: verified (bool), error (str or None)
     """
-    phone_storage = normalize_phone_for_storage(phone)
+    phone_storage = normalize_phone(phone)
     if not phone_storage:
         return {"verified": False, "error": "מספר טלפון לא תקין"}
 
@@ -245,7 +211,7 @@ def _send_otp_sms(phone, code):
     Returns:
         True if sent via SMS, False if mocked.
     """
-    phone_intl = normalize_phone_for_sms(phone)
+    phone_intl = normalize_phone(phone)
 
     if not TWILIO_ENABLED:
         logger.info("[Twilio][OTP] MOCK MODE - Code for %s: %s (Twilio disabled)", phone, code)
