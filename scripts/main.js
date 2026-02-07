@@ -779,9 +779,12 @@ function validateBookingData(data) {
         errors.push('נא להזין שם מלא');
     }
 
-    const phoneClean = (data.phone || '').replace(/[-\s]/g, '');
-    if (!phoneClean || !/^0(5[0-9]|[2-4]|[8-9])\d{7}$/.test(phoneClean)) {
+    // Validate phone using PhoneUtils - normalize first, then validate
+    const normalizedPhone = PhoneUtils.normalize(data.phone);
+    if (!normalizedPhone) {
         errors.push('נא להזין מספר טלפון תקין');
+    } else if (!PhoneUtils.isValidNormalized(normalizedPhone)) {
+        errors.push('נא להזין מספר טלפון נייד ישראלי תקין');
     }
 
     if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {

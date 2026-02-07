@@ -433,9 +433,13 @@ function validateForm(form) {
         if (!field.value.trim()) {
             showFieldError(field, 'שדה חובה');
             isValid = false;
-        } else if (field.type === 'tel' && !isValidPhone(field.value)) {
-            showFieldError(field, 'מספר טלפון לא תקין');
-            isValid = false;
+        } else if (field.type === 'tel') {
+            // Use PhoneUtils to validate - normalize first, then check
+            const normalized = PhoneUtils.normalize(field.value);
+            if (!normalized) {
+                showFieldError(field, 'מספר טלפון לא תקין');
+                isValid = false;
+            }
         }
     });
 
@@ -443,8 +447,9 @@ function validateForm(form) {
 }
 
 function isValidPhone(phone) {
-    const phoneRegex = /^[\d\-+\s()]{9,15}$/;
-    return phoneRegex.test(phone);
+    // Use PhoneUtils for validation - normalize first
+    const normalized = PhoneUtils.normalize(phone);
+    return normalized !== null;
 }
 
 function showFieldError(field, message) {
