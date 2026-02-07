@@ -36,13 +36,22 @@ from email_service import (
     send_email
 )
 
-# Import WhatsApp service
-from whatsapp_service import send_whatsapp_booking_confirmation
+# Import Twilio SMS service
+try:
+    from twilio_sms_service import (
+        send_booking_confirmation as send_sms_booking_confirmation,
+        send_reminder_day_before as send_sms_reminder_day_before,
+        send_reminder_morning as send_sms_reminder_morning
+    )
+    SMS_SERVICE_AVAILABLE = True
+except Exception as sms_error:
+    print(f"[SMS] Twilio service not available: {sms_error}")
+    SMS_SERVICE_AVAILABLE = False
 
-# Import WhatsApp OTP service (database version if available, fallback to in-memory)
+# Import Twilio OTP service (database version)
 try:
     from db_service import init_db_pool, is_db_available, run_migrations
-    from whatsapp_otp_db import request_otp, verify_otp
+    from twilio_otp import request_otp, verify_otp
     from customer_service import (
         customer_exists, get_customer_by_phone, create_customer,
         get_all_customers, search_customers, get_customer_count
@@ -53,10 +62,14 @@ try:
         get_appointments_for_date, update_google_event_id
     )
     DB_ENABLED = True
-    print("[Database] Using PostgreSQL database")
+    print("[Database] Using PostgreSQL database with Twilio SMS")
 except Exception as db_import_error:
     print(f"[Database] PostgreSQL not available, using legacy mode: {db_import_error}")
-    from whatsapp_otp import request_otp, verify_otp
+    # Fallback to old WhatsApp OTP if Twilio not available
+    try:
+        from whatsapp_otp import request_otp, verify_otp
+    except:
+        print("[OTP] No OTP service available")
     DB_ENABLED = False
 
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -270,12 +283,70 @@ def get_appointments_by_phone(phone):
 def check_and_send_reminders():
     """
     Check for upcoming appointments and send reminders.
-    Called by the scheduler.
+    Called by the scheduler. Works with both DB and Calendar.
     """
     try:
         # Clean up old reminder keys first
         cleanup_old_reminders()
 
+        now = datetime.now(ISRAEL_TZ)
+        today = now.date()
+        tomorrow = today + timedelta(days=1)
+
+        # Try database first if available
+        if DB_ENABLED:
+            try:
+                from appointment_service import get_appointments_needing_reminders
+                reminders_data = get_appointments_needing_reminders()
+
+                # Send day-before reminders (20:00)
+                if now.hour == 20:
+                    for apt in reminders_data.get('day_before', []):
+                        reminder_key = f"day_before_{apt['id']}"
+                        if reminder_key not in sent_reminders:
+                            booking_data = {
+                                'name': apt['customer_name'],
+                                'phone': apt['customer_phone'],
+                                'email': apt['customer_email'],
+                                'service_he': apt['service_name_he'],
+                                'date': apt['datetime'].strftime('%Y-%m-%d'),
+                                'time': apt['datetime'].strftime('%H:%M'),
+                            }
+                            # Send email reminder
+                            send_reminder_day_before(booking_data)
+                            # Send SMS reminder if enabled
+                            if SMS_SERVICE_AVAILABLE:
+                                send_sms_reminder_day_before(booking_data)
+                            sent_reminders[reminder_key] = apt['datetime'].date()
+                            print(f"[DB] Sent day-before reminder to {apt['customer_email']}")
+
+                # Send morning reminders (08:00)
+                if now.hour == 8:
+                    for apt in reminders_data.get('morning', []):
+                        reminder_key = f"morning_{apt['id']}"
+                        if reminder_key not in sent_reminders:
+                            booking_data = {
+                                'name': apt['customer_name'],
+                                'phone': apt['customer_phone'],
+                                'email': apt['customer_email'],
+                                'service_he': apt['service_name_he'],
+                                'date': apt['datetime'].strftime('%Y-%m-%d'),
+                                'time': apt['datetime'].strftime('%H:%M'),
+                            }
+                            # Send email reminder
+                            send_reminder_morning(booking_data)
+                            # Send SMS reminder if enabled
+                            if SMS_SERVICE_AVAILABLE:
+                                send_sms_reminder_morning(booking_data)
+                            sent_reminders[reminder_key] = apt['datetime'].date()
+                            print(f"[DB] Sent morning reminder to {apt['customer_email']}")
+
+                return  # Successfully used database
+
+            except Exception as db_error:
+                print(f"[Reminders] DB error, falling back to Calendar: {str(db_error)}")
+
+        # Fallback to Calendar-based reminders (legacy mode)
         service = get_calendar_service()
         now = datetime.now(ISRAEL_TZ)
         today = now.date()
@@ -347,7 +418,7 @@ def check_and_send_reminders():
                 if reminder_key not in sent_reminders:
                     send_reminder_day_before(booking_data)
                     sent_reminders[reminder_key] = event_date
-                    print(f"Sent day-before reminder to {email}")
+                    print(f"[Calendar] Sent day-before reminder to {email}")
 
             # Check if we need to send morning reminder (08:00 same day)
             if event_date == today and now.hour == 8:
@@ -355,7 +426,7 @@ def check_and_send_reminders():
                 if reminder_key not in sent_reminders:
                     send_reminder_morning(booking_data)
                     sent_reminders[reminder_key] = event_date
-                    print(f"Sent morning reminder to {email}")
+                    print(f"[Calendar] Sent morning reminder to {email}")
 
     except Exception as e:
         print(f"Error checking reminders: {str(e)}")
@@ -661,22 +732,22 @@ def book_appointment():
         except Exception as email_error:
             print(f"Failed to send confirmation email: {str(email_error)}")
 
-        # Send WhatsApp confirmation in background (non-blocking)
-        wa_enabled = os.getenv("WHATSAPP_ENABLED", "false").lower() == "true"
-        print(f"[WhatsApp] enabled={wa_enabled}, phone={booking_data.get('phone')}")
-        if wa_enabled:
+        # Send SMS confirmation in background (non-blocking)
+        sms_enabled = os.getenv("TWILIO_ENABLED", "false").lower() == "true"
+        print(f"[Twilio] SMS enabled={sms_enabled}, phone={booking_data.get('phone')}")
+        if sms_enabled and SMS_SERVICE_AVAILABLE:
             try:
-                print(f"[WhatsApp] Sending booking confirmation to {booking_data.get('name')}...")
-                wa_thread = threading.Thread(
-                    target=send_whatsapp_booking_confirmation,
+                print(f"[Twilio] Sending booking confirmation SMS to {booking_data.get('name')}...")
+                sms_thread = threading.Thread(
+                    target=send_sms_booking_confirmation,
                     args=(booking_data,),
                     daemon=True
                 )
-                wa_thread.start()
-            except Exception as wa_error:
-                print(f"[WhatsApp] Failed to start thread: {str(wa_error)}")
+                sms_thread.start()
+            except Exception as sms_error:
+                print(f"[Twilio] Failed to start SMS thread: {str(sms_error)}")
         else:
-            print("[WhatsApp] Skipping - WHATSAPP_ENABLED is not true")
+            print("[Twilio] Skipping SMS - TWILIO_ENABLED is not true or service unavailable")
 
         return jsonify({
             "success": True,
