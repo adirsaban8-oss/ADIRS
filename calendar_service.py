@@ -292,3 +292,33 @@ def filter_available_slots(date_str, all_slots, service_duration=30):
         # If calendar service fails, return all slots (graceful degradation)
         print(f"Warning: Could not filter busy slots: {str(e)}")
         return all_slots
+
+
+def cancel_event(event_id):
+    """
+    Cancel/delete a calendar event by its ID.
+
+    Args:
+        event_id: The Google Calendar event ID
+
+    Returns:
+        True if successfully cancelled, False otherwise
+    """
+    try:
+        service = get_calendar_service()
+        service.events().delete(
+            calendarId=CALENDAR_ID,
+            eventId=event_id
+        ).execute()
+        print(f"Event {event_id} cancelled successfully")
+        return True
+
+    except HttpError as e:
+        if e.resp.status == 404:
+            print(f"Event {event_id} not found (may already be cancelled)")
+            return True  # Treat as success if already gone
+        print(f"Google Calendar API error cancelling event: {str(e)}")
+        return False
+    except Exception as e:
+        print(f"Failed to cancel event: {str(e)}")
+        return False

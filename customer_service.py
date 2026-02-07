@@ -261,3 +261,87 @@ def get_customer_count():
     except Exception as e:
         logger.error(f"Error counting customers: {str(e)}")
         return 0
+
+
+def get_customer_future_appointments(customer_id):
+    """
+    Get future appointments for a customer.
+
+    Args:
+        customer_id: Customer UUID
+
+    Returns:
+        List of future appointment dicts
+    """
+    try:
+        appointments = execute_query(
+            """
+            SELECT id, service_name_he, datetime, status
+            FROM appointments
+            WHERE customer_id = %s
+            AND datetime > NOW()
+            AND status = 'active'
+            ORDER BY datetime ASC
+            """,
+            (customer_id,),
+            fetch_all=True
+        )
+        return appointments or []
+    except Exception as e:
+        logger.error(f"Error fetching future appointments: {str(e)}")
+        return []
+
+
+def delete_customer(customer_id, force=False):
+    """
+    Delete a customer from the database.
+
+    Args:
+        customer_id: Customer UUID
+        force: If True, delete even if customer has future appointments
+               (appointments will be cascade-deleted)
+
+    Returns:
+        dict with keys:
+            - success: bool
+            - error: str (if failed)
+            - has_future_appointments: bool
+            - future_appointments: list (if has_future_appointments)
+    """
+    if not customer_id:
+        return {"success": False, "error": "Customer ID required"}
+
+    try:
+        # Check if customer exists
+        customer = execute_query(
+            "SELECT id, name, phone FROM customers WHERE id = %s",
+            (customer_id,),
+            fetch_one=True
+        )
+
+        if not customer:
+            return {"success": False, "error": "Customer not found"}
+
+        # Check for future active appointments
+        future_apts = get_customer_future_appointments(customer_id)
+
+        if future_apts and not force:
+            return {
+                "success": False,
+                "error": "Customer has future appointments",
+                "has_future_appointments": True,
+                "future_appointments": future_apts
+            }
+
+        # Delete the customer (appointments cascade-delete due to FK constraint)
+        execute_query(
+            "DELETE FROM customers WHERE id = %s",
+            (customer_id,)
+        )
+
+        logger.info(f"Deleted customer: {customer['name']} ({customer['phone']})")
+        return {"success": True}
+
+    except Exception as e:
+        logger.error(f"Error deleting customer: {str(e)}")
+        return {"success": False, "error": str(e)}

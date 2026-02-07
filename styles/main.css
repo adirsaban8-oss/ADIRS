@@ -912,6 +912,44 @@ body {
   color: var(--color-text-tertiary);
 }
 
+.apt-card-actions {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+}
+
+.apt-cancel-btn {
+  background: transparent;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  padding: var(--space-xs) var(--space-md);
+  border-radius: var(--radius-md);
+  font-family: var(--font-hebrew-body);
+  font-size: var(--font-size-small);
+  cursor: pointer;
+  transition: all var(--transition-luxury);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.apt-cancel-btn:hover {
+  background: #dc3545;
+  color: white;
+}
+
+.apt-cancel-disabled {
+  font-size: var(--font-size-small);
+  color: var(--color-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.apt-cancel-disabled i {
+  color: var(--color-gold);
+}
+
 .apt-empty-card {
   background: var(--color-bg-card);
   padding: var(--space-2xl);

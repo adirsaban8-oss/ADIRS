@@ -35,6 +35,7 @@ from calendar_service import (
     filter_available_slots,
     check_availability,
     create_event,
+    cancel_event,
     get_calendar_service,
     CALENDAR_ID
 )
@@ -69,7 +70,8 @@ try:
     from twilio_otp import request_otp, verify_otp
     from customer_service import (
         customer_exists, get_customer_by_phone, create_customer,
-        get_all_customers, search_customers, get_customer_count
+        get_all_customers, search_customers, get_customer_count,
+        delete_customer, get_customer_future_appointments as get_customer_future_apts
     )
     from appointment_service import (
         create_appointment, get_customer_future_appointments,
@@ -288,6 +290,8 @@ def get_appointments_by_phone(phone):
                 'time': event_start_il.strftime('%H:%M'),
                 'day_name': day_name,
                 'iso_date': event_start_il.strftime('%Y-%m-%d'),
+                'event_id': event.get('id', ''),
+                'datetime_raw': event_start_il.isoformat(),
             })
 
         _appointments_cache[phone_norm] = {
@@ -830,6 +834,62 @@ def my_appointments():
     })
 
 
+@app.route('/api/cancel-appointment', methods=['POST'])
+def cancel_appointment():
+    """
+    Cancel an appointment by event ID.
+    Requires the appointment to be at least 4 hours in the future.
+    """
+    data = request.json or {}
+    event_id = data.get('event_id', '').strip()
+
+    if not event_id:
+        return jsonify({"success": False, "error": "מזהה תור חסר"}), 400
+
+    try:
+        # Get the event details from Google Calendar to verify timing
+        service = get_calendar_service()
+        try:
+            event = service.events().get(
+                calendarId=CALENDAR_ID,
+                eventId=event_id
+            ).execute()
+        except Exception as e:
+            return jsonify({"success": False, "error": "התור לא נמצא"}), 404
+
+        # Check if appointment is at least 4 hours in the future
+        from datetime import datetime
+        import pytz
+
+        event_start_str = event['start'].get('dateTime', event['start'].get('date'))
+        event_start = datetime.fromisoformat(event_start_str.replace('Z', '+00:00'))
+
+        # Make sure we're comparing timezone-aware datetimes
+        israel_tz = pytz.timezone('Asia/Jerusalem')
+        now = datetime.now(israel_tz)
+
+        if event_start.tzinfo is None:
+            event_start = israel_tz.localize(event_start)
+
+        diff_hours = (event_start - now).total_seconds() / 3600
+
+        if diff_hours < 4:
+            return jsonify({
+                "success": False,
+                "error": "לא ניתן לבטל תור פחות מ-4 שעות לפני המועד"
+            }), 400
+
+        # Cancel the event
+        if cancel_event(event_id):
+            return jsonify({"success": True, "message": "התור בוטל בהצלחה"})
+        else:
+            return jsonify({"success": False, "error": "שגיאה בביטול התור"}), 500
+
+    except Exception as e:
+        print(f"Cancel appointment error: {str(e)}")
+        return jsonify({"success": False, "error": "שגיאה טכנית. נסי שוב."}), 500
+
+
 # ============== OTP AUTHENTICATION ==============
 
 @app.route('/api/otp/request', methods=['POST'])
@@ -1051,6 +1111,36 @@ def get_admin_customers():
     except Exception as e:
         print(f"Error fetching customers: {str(e)}")
         return jsonify({"error": "שגיאה בטעינת לקוחות"}), 500
+
+
+@app.route('/api/admin/customers/<customer_id>', methods=['DELETE'])
+@admin_required
+def delete_admin_customer(customer_id):
+    """Delete a customer from the database."""
+    if not DB_ENABLED:
+        return jsonify({"error": "Database not available"}), 503
+
+    # Check if force delete is requested
+    force = request.args.get('force', 'false').lower() == 'true'
+
+    try:
+        result = delete_customer(customer_id, force=force)
+
+        if not result['success']:
+            if result.get('has_future_appointments'):
+                # Return info about future appointments
+                return jsonify({
+                    "error": "ללקוח/ה יש תורים עתידיים",
+                    "has_future_appointments": True,
+                    "future_appointments": result.get('future_appointments', [])
+                }), 400
+            return jsonify({"error": result.get('error', 'שגיאה במחיקת לקוח')}), 400
+
+        return jsonify({"success": True, "message": "הלקוח/ה נמחק/ה בהצלחה"})
+
+    except Exception as e:
+        print(f"Error deleting customer: {str(e)}")
+        return jsonify({"error": "שגיאה במחיקת לקוח"}), 500
 
 
 @app.route('/api/admin/blocked-slots', methods=['GET'])

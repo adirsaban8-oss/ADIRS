@@ -138,9 +138,9 @@
                 <li><a href="#services" class="nav-link">שירותים</a></li>
                 <li><a href="#policies" class="nav-link">מדיניות</a></li>
                 <li><a href="#booking" class="nav-link">הזמנת תור</a></li>
-                <li><a href="#my-appointments" class="nav-link">התורים שלי</a></li>
                 <li><a href="#gallery" class="nav-link">גלריה</a></li>
                 <li><a href="#contact" class="nav-link">צור קשר</a></li>
+                <li><a href="#my-appointments" class="nav-link">התורים שלי</a></li>
                 <li><a href="#about" class="nav-link">אודות</a></li>
                 <li id="navIdentityReset" style="display: none;">
                     <button class="nav-link identity-reset-btn" onclick="UserIdentity.reset()">
@@ -401,22 +401,18 @@
             </div>
 
             <div class="my-apt-container">
-                <!-- State 1: Phone input -->
-                <div id="aptPhoneForm" class="apt-phone-form">
+                <!-- State 0: Login required -->
+                <div id="aptLoginRequired" class="apt-phone-form">
                     <div class="apt-phone-card">
                         <div class="apt-phone-icon">
-                            <i class="fas fa-calendar-alt"></i>
+                            <i class="fas fa-lock"></i>
                         </div>
-                        <h3>הזדהי לצפייה בתורים שלך</h3>
-                        <p>הכניסי את מספר הטלפון שאיתו הזמנת</p>
-                        <div class="apt-phone-input-row">
-                            <input type="tel" id="aptPhoneInput" class="input" placeholder="050-123-4567" dir="ltr" pattern="[0-9\-\+\s]*" inputmode="tel">
-                            <button id="aptPhoneSubmit" class="btn btn-primary">
-                                <i class="fas fa-search"></i>
-                                חפשי
-                            </button>
-                        </div>
-                        <div id="aptPhoneError" class="apt-inline-message apt-error" style="display: none;"></div>
+                        <h3>נדרשת הזדהות</h3>
+                        <p>כדי לצפות בתורים שלך, יש להזדהות תחילה</p>
+                        <button onclick="UserIdentity.showOverlay()" class="btn btn-primary" style="margin-top: 16px;">
+                            <i class="fas fa-sign-in-alt"></i>
+                            להזדהות
+                        </button>
                     </div>
                 </div>
 

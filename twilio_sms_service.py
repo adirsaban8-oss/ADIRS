@@ -29,6 +29,9 @@ BUSINESS_NAME = "LISHAI SIMANI Beauty Studio"
 BUSINESS_ADDRESS = "משעול הרקפת 3, קרני שומרון"
 BUSINESS_PHONE = "051-5656295"
 
+# Waze navigation link - URL encoded address
+WAZE_LINK = "https://waze.com/ul?q=%D7%9E%D7%A9%D7%A2%D7%95%D7%9C%20%D7%94%D7%A8%D7%A7%D7%A4%D7%AA%203%20%D7%A7%D7%A8%D7%A0%D7%99%20%D7%A9%D7%95%D7%9E%D7%A8%D7%95%D7%9F&navigate=yes"
+
 
 def normalize_phone(phone):
     """
@@ -126,6 +129,8 @@ def send_booking_confirmation(booking_data):
 📍 כתובת: {BUSINESS_ADDRESS}
 📞 טלפון: {BUSINESS_PHONE}
 
+🚗 ניווט ב-Waze: {WAZE_LINK}
+
 לביטול תור, התקשרי אלינו.
 
 תודה שבחרת בנו! 💖"""
@@ -171,6 +176,7 @@ def send_reminder_day_before(booking_data):
 💅 {service}
 
 📍 {BUSINESS_ADDRESS}
+🚗 ניווט ב-Waze: {WAZE_LINK}
 
 מצפים לראותך! 💖
 
@@ -208,6 +214,7 @@ def send_reminder_morning(booking_data):
 💅 {service}
 
 📍 {BUSINESS_ADDRESS}
+🚗 ניווט ב-Waze: {WAZE_LINK}
 
 נתראה בקרוב! 💖"""
 
@@ -253,6 +260,7 @@ def send_cancellation_confirmation(booking_data):
 
 להזמנת תור חדש:
 📞 {BUSINESS_PHONE}
+🚗 ניווט ב-Waze: {WAZE_LINK}
 
 {BUSINESS_NAME}"""
 
