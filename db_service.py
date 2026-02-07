@@ -172,85 +172,280 @@ def is_db_available():
         return False
 
 
+def _get_raw_connection():
+    """
+    Get a raw database connection for migrations.
+    Used before the pool might be fully ready or for special operations.
+    """
+    database_url = os.getenv('DATABASE_URL')
+    if not database_url:
+        return None
+
+    if database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+    return psycopg2.connect(database_url)
+
+
+def _ensure_migrations_lock_table(conn):
+    """
+    Create the migrations lock table if it doesn't exist.
+    This table is used to coordinate migrations across multiple Gunicorn workers.
+
+    IMPORTANT FOR GUNICORN/RAILWAY:
+    When Gunicorn spawns multiple workers, each worker imports app.py and tries
+    to run migrations. Without a database-level lock, this causes race conditions
+    and "duplicate key" errors. This lock table ensures only ONE worker runs
+    migrations while others wait or skip.
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS _schema_migrations_lock (
+                id INTEGER PRIMARY KEY DEFAULT 1,
+                locked BOOLEAN DEFAULT FALSE,
+                locked_at TIMESTAMP,
+                locked_by VARCHAR(255),
+                migrations_completed BOOLEAN DEFAULT FALSE,
+                completed_at TIMESTAMP,
+                CONSTRAINT single_row CHECK (id = 1)
+            )
+        """)
+        conn.commit()
+    finally:
+        cursor.close()
+
+
+def _try_acquire_migration_lock(conn, worker_id):
+    """
+    Try to acquire the migration lock using PostgreSQL row-level locking.
+    Returns: (lock_acquired, migrations_already_done)
+
+    Uses SELECT FOR UPDATE NOWAIT to avoid blocking - if another worker
+    has the lock, we immediately know and can skip migrations.
+    """
+    cursor = conn.cursor()
+    try:
+        # Insert the lock row if it doesn't exist
+        cursor.execute("""
+            INSERT INTO _schema_migrations_lock (id, locked, migrations_completed)
+            VALUES (1, FALSE, FALSE)
+            ON CONFLICT (id) DO NOTHING
+        """)
+        conn.commit()
+
+        # Try to acquire lock with NOWAIT - fails immediately if locked
+        cursor.execute("""
+            SELECT locked, migrations_completed
+            FROM _schema_migrations_lock
+            WHERE id = 1
+            FOR UPDATE NOWAIT
+        """)
+        row = cursor.fetchone()
+
+        if row is None:
+            return False, False
+
+        locked, migrations_completed = row
+
+        # If migrations already completed by another worker, skip
+        if migrations_completed:
+            conn.commit()
+            return False, True
+
+        # If already locked by another worker (shouldn't happen with NOWAIT, but safety check)
+        if locked:
+            conn.commit()
+            return False, False
+
+        # Acquire the lock
+        cursor.execute("""
+            UPDATE _schema_migrations_lock
+            SET locked = TRUE, locked_at = NOW(), locked_by = %s
+            WHERE id = 1
+        """, (worker_id,))
+        conn.commit()
+        return True, False
+
+    except psycopg2.errors.LockNotAvailable:
+        # Another worker has the lock - skip migrations
+        conn.rollback()
+        return False, False
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error acquiring migration lock: {str(e)}")
+        return False, False
+    finally:
+        cursor.close()
+
+
+def _release_migration_lock(conn, success):
+    """
+    Release the migration lock and mark migrations as completed if successful.
+    """
+    cursor = conn.cursor()
+    try:
+        if success:
+            cursor.execute("""
+                UPDATE _schema_migrations_lock
+                SET locked = FALSE, locked_at = NULL, locked_by = NULL,
+                    migrations_completed = TRUE, completed_at = NOW()
+                WHERE id = 1
+            """)
+        else:
+            cursor.execute("""
+                UPDATE _schema_migrations_lock
+                SET locked = FALSE, locked_at = NULL, locked_by = NULL
+                WHERE id = 1
+            """)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Error releasing migration lock: {str(e)}")
+    finally:
+        cursor.close()
+
+
 def run_migrations():
     """
     Run database migrations to set up schema.
-    Safe to run multiple times (uses CREATE TABLE IF NOT EXISTS).
+
+    GUNICORN/RAILWAY SAFE:
+    This function uses PostgreSQL-based locking to ensure migrations run
+    exactly ONCE across all Gunicorn workers. When multiple workers start
+    simultaneously:
+    1. First worker acquires the DB lock and runs migrations
+    2. Other workers see the lock and skip migrations
+    3. After migrations complete, lock is released and marked as done
+    4. Future deployments check "migrations_completed" flag and skip
+
+    This prevents "duplicate key" errors from concurrent CREATE INDEX/TABLE.
     """
-    migrations = [
-        # Customers table
-        """
-        CREATE TABLE IF NOT EXISTS customers (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name VARCHAR(100) NOT NULL,
-            phone VARCHAR(20) NOT NULL UNIQUE,
-            email VARCHAR(100),
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        )
-        """,
+    import uuid
+    worker_id = f"worker-{uuid.uuid4().hex[:8]}-pid-{os.getpid()}"
 
-        # Appointments table
-        """
-        CREATE TABLE IF NOT EXISTS appointments (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-            service_name VARCHAR(50) NOT NULL,
-            service_name_he VARCHAR(50) NOT NULL,
-            datetime TIMESTAMP NOT NULL,
-            duration INTEGER NOT NULL,
-            status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed')),
-            google_event_id VARCHAR(255),
-            notes TEXT,
-            created_at TIMESTAMP DEFAULT NOW(),
-            updated_at TIMESTAMP DEFAULT NOW()
-        )
-        """,
-
-        # OTP codes table
-        """
-        CREATE TABLE IF NOT EXISTS otp_codes (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            phone VARCHAR(20) NOT NULL,
-            code VARCHAR(6) NOT NULL,
-            expires_at TIMESTAMP NOT NULL,
-            verified BOOLEAN DEFAULT FALSE,
-            attempts INTEGER DEFAULT 0,
-            cooldown_until TIMESTAMP,
-            created_at TIMESTAMP DEFAULT NOW()
-        )
-        """,
-
-        # Indexes
-        """
-        CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_appointments_datetime ON appointments(datetime)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone)
-        """,
-        """
-        CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes(expires_at)
-        """
-    ]
+    # Get a dedicated connection for migrations (not from pool)
+    conn = _get_raw_connection()
+    if not conn:
+        logger.error("Cannot run migrations: no database connection")
+        return False
 
     try:
-        with get_db_cursor() as cursor:
+        # Step 1: Ensure lock table exists
+        _ensure_migrations_lock_table(conn)
+
+        # Step 2: Try to acquire migration lock
+        lock_acquired, already_done = _try_acquire_migration_lock(conn, worker_id)
+
+        if already_done:
+            print(f"[Database] Migrations already completed by another worker, skipping")
+            logger.info("Migrations already completed, skipping")
+            conn.close()
+            return True
+
+        if not lock_acquired:
+            print(f"[Database] Another worker is running migrations, skipping")
+            logger.info("Migration lock held by another worker, skipping")
+            conn.close()
+            return True
+
+        # Step 3: We have the lock - run migrations
+        print(f"[Database] Worker {worker_id} acquired migration lock, running migrations...")
+        logger.info(f"Worker {worker_id} running migrations")
+
+        migrations = [
+            # Customers table
+            """
+            CREATE TABLE IF NOT EXISTS customers (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                name VARCHAR(100) NOT NULL,
+                phone VARCHAR(20) NOT NULL UNIQUE,
+                email VARCHAR(100),
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+
+            # Appointments table
+            """
+            CREATE TABLE IF NOT EXISTS appointments (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+                service_name VARCHAR(50) NOT NULL,
+                service_name_he VARCHAR(50) NOT NULL,
+                datetime TIMESTAMP NOT NULL,
+                duration INTEGER NOT NULL,
+                status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed')),
+                google_event_id VARCHAR(255),
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+
+            # OTP codes table
+            """
+            CREATE TABLE IF NOT EXISTS otp_codes (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                phone VARCHAR(20) NOT NULL,
+                code VARCHAR(6) NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                verified BOOLEAN DEFAULT FALSE,
+                attempts INTEGER DEFAULT 0,
+                cooldown_until TIMESTAMP,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+            """,
+
+            # Indexes - wrapped in DO block to handle "already exists" gracefully
+            """
+            CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_appointments_customer ON appointments(customer_id)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_appointments_datetime ON appointments(datetime)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_appointments_status ON appointments(status)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes(expires_at)
+            """
+        ]
+
+        cursor = conn.cursor()
+        try:
             for migration in migrations:
                 cursor.execute(migration)
+            conn.commit()
+            success = True
+            print(f"[Database] Migrations completed successfully by {worker_id}")
+            logger.info("Database migrations completed successfully")
+        except Exception as e:
+            conn.rollback()
+            success = False
+            logger.error(f"Migration error: {str(e)}")
+            print(f"[Database] Migration error: {str(e)}", file=sys.stderr)
+        finally:
+            cursor.close()
 
-        logger.info("Database migrations completed successfully")
-        return True
+        # Step 4: Release lock and mark completion
+        _release_migration_lock(conn, success)
+        conn.close()
+        return success
+
     except Exception as e:
-        logger.error(f"Migration error: {str(e)}")
+        logger.error(f"Migration process error: {str(e)}")
+        print(f"[Database] Migration process error: {str(e)}", file=sys.stderr)
+        try:
+            conn.close()
+        except:
+            pass
         return False
 
 
