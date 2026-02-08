@@ -27,8 +27,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import pytz
 
-# Load environment variables FIRST - before any other imports that might need them
-load_dotenv()
+# Load .env ONLY in local development. On Railway, env vars are set by the platform.
+if not os.getenv('RAILWAY_ENVIRONMENT'):
+    load_dotenv(override=False)
 
 # Import calendar service
 from calendar_service import (

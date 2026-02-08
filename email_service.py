@@ -9,9 +9,8 @@ import logging
 import requests
 import traceback
 from datetime import datetime
-from dotenv import load_dotenv
 
-load_dotenv()
+# No load_dotenv() here – app.py loads env vars before importing this module.
 
 # Configure logging for production (Railway)
 logging.basicConfig(

@@ -10,9 +10,8 @@ from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from dotenv import load_dotenv
 
-load_dotenv()
+# No load_dotenv() here – app.py loads env vars before importing this module.
 
 logger = logging.getLogger(__name__)
 
