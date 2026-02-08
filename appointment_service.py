@@ -128,10 +128,39 @@ def get_customer_past_appointments(customer_id, limit=10):
         return []
 
 
+def count_active_future_appointments(customer_id):
+    """
+    Count how many active future appointments a customer has.
+    Business rule: up to 2 active future appointments allowed.
+
+    Args:
+        customer_id: Customer UUID
+
+    Returns:
+        int: number of active future appointments (0 on error)
+    """
+    try:
+        result = execute_query(
+            """
+            SELECT COUNT(*) as cnt
+            FROM appointments
+            WHERE customer_id = %s
+            AND status = 'active'
+            AND datetime > NOW()
+            """,
+            (customer_id,),
+            fetch_one=True
+        )
+        return result['cnt'] if result else 0
+    except Exception as e:
+        logger.error(f"Error counting active appointments: {str(e)}")
+        return 0
+
+
 def has_active_future_appointment(customer_id):
     """
     Check if customer has an active future appointment.
-    Business rule: only one active future appointment allowed.
+    Kept for backward compatibility.
 
     Args:
         customer_id: Customer UUID

@@ -200,7 +200,7 @@
 # Services data
 SERVICES = [
     {"name": "Gel Polish", "name_he": "לק ג'ל", "price": 120, "duration": 60, "icon": "💅"},
-    {"name": "Anatomical Build", "name_he": "בנייה אנטומית", "price": 140, "duration": 75, "icon": "✨"},
+    {"name": "Anatomical Structure", "name_he": "מבנה אנטומי", "price": 140, "duration": 75, "icon": "✨"},
     {"name": "Gel Fill", "name_he": "מילוי ג'ל", "price": 150, "duration": 60, "icon": "💎"},
     {"name": "Single Nail Extension", "name_he": "הארכת ציפורן בודדת", "price": 10, "duration": 10, "note": "per nail", "icon": "💫"},
     {"name": "Building", "name_he": "בנייה", "price": 300, "duration": 120, "icon": "🏆"},

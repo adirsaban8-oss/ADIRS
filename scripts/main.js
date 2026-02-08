@@ -15,7 +15,7 @@ const CONFIG = {
     },
     SERVICES: {
         'gel-polish': { name: 'לק ג\'ל', nameEn: 'Gel Polish', duration: 60, price: 120 },
-        'anatomical-build': { name: 'בנייה אנטומית', nameEn: 'Anatomical Build', duration: 75, price: 140 },
+        'anatomical-build': { name: 'מבנה אנטומי', nameEn: 'Anatomical Structure', duration: 75, price: 140 },
         'gel-fill': { name: 'מילוי ג\'ל', nameEn: 'Gel Fill', duration: 60, price: 150 },
         'building': { name: 'בנייה', nameEn: 'Building', duration: 120, price: 300 },
         'eyebrows': { name: 'גבות', nameEn: 'Eyebrows', duration: 20, price: 50 },
@@ -1127,14 +1127,14 @@ const MyAppointments = {
             const card = document.createElement('div');
             card.className = 'apt-card fade-in visible';
 
-            // Check if appointment can be cancelled (>= 4 hours in future)
+            // Check if appointment can be cancelled (not on same day)
             const canCancel = self.canCancelAppointment(apt.datetime_raw || apt.datetime);
             const cancelBtnHtml = canCancel
                 ? `<button class="apt-cancel-btn" onclick="MyAppointments.cancelAppointment('${apt.event_id}', '${apt.date}', '${apt.time}')">
                        <i class="fas fa-times"></i> ביטול תור
                    </button>`
                 : `<div class="apt-cancel-disabled">
-                       <i class="fas fa-clock"></i> לא ניתן לבטל תור פחות מ-4 שעות לפני
+                       <i class="fas fa-clock"></i> לא ניתן לבטל תור ביום התור עצמו
                    </div>`;
 
             card.innerHTML =
@@ -1154,9 +1154,12 @@ const MyAppointments = {
         try {
             const aptTime = new Date(datetimeStr);
             const now = new Date();
-            const diffMs = aptTime - now;
-            const diffHours = diffMs / (1000 * 60 * 60);
-            return diffHours >= 4;
+            // Compare calendar dates in Israel timezone
+            const israelOptions = { timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit' };
+            const aptDateStr = aptTime.toLocaleDateString('en-CA', israelOptions);
+            const nowDateStr = now.toLocaleDateString('en-CA', israelOptions);
+            // Block if appointment is today or in the past
+            return aptDateStr > nowDateStr;
         } catch (e) {
             return false;
         }

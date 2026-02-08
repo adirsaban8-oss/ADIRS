@@ -76,7 +76,7 @@ try:
     )
     from appointment_service import (
         create_appointment, get_customer_future_appointments,
-        has_active_future_appointment, cancel_appointment,
+        has_active_future_appointment, count_active_future_appointments, cancel_appointment,
         get_appointments_for_date, update_google_event_id
     )
     DB_ENABLED = True
@@ -467,7 +467,7 @@ atexit.register(lambda: scheduler.shutdown())
 
 SERVICES = [
     {"name": "Gel Polish", "name_he": "לק ג'ל", "price": 120, "duration": 60},
-    {"name": "Anatomical Build", "name_he": "בנייה אנטומית", "price": 140, "duration": 75},
+    {"name": "Anatomical Structure", "name_he": "מבנה אנטומי", "price": 140, "duration": 75},
     {"name": "Gel Fill", "name_he": "מילוי ג'ל", "price": 150, "duration": 60},
     {"name": "Single Nail Extension", "name_he": "הארכת ציפורן בודדת", "price": 10, "duration": 10},
     {"name": "Building", "name_he": "בנייה", "price": 300, "duration": 120},
@@ -640,20 +640,11 @@ def book_appointment():
                 if not customer:
                     return jsonify({"error": "שגיאה ביצירת משתמש. נסי שוב."}), 500
 
-            # Check if customer has active future appointment (BUSINESS RULE)
-            existing_apt = has_active_future_appointment(customer['id'])
-            if existing_apt:
-                apt_datetime = existing_apt['datetime']
-                apt_date_str = apt_datetime.strftime('%d/%m/%Y')
-                apt_time_str = apt_datetime.strftime('%H:%M')
+            # Check if customer has reached max future appointments (BUSINESS RULE: max 2)
+            active_count = count_active_future_appointments(customer['id'])
+            if active_count >= 2:
                 return jsonify({
-                    "error": f"כבר יש לך תור בתאריך {apt_date_str} בשעה {apt_time_str}. "
-                             f"ניתן להזמין תור חדש רק לאחר שהתור הקיים יעבור.",
-                    "existing_appointment": {
-                        "date": apt_date_str,
-                        "time": apt_time_str,
-                        "service": existing_apt['service_name_he']
-                    }
+                    "error": "כבר יש לך 2 תורים עתידיים. ניתן להזמין תור חדש רק לאחר שאחד מהם יעבור או יבוטל."
                 }), 409
 
             # Check availability from Calendar
@@ -831,7 +822,7 @@ def my_appointments():
 def cancel_appointment():
     """
     Cancel an appointment by event ID.
-    Requires the appointment to be at least 4 hours in the future.
+    NOT allowed if the appointment is on the same calendar date (Israel time).
     """
     data = request.json or {}
     event_id = data.get('event_id', '').strip()
@@ -850,27 +841,30 @@ def cancel_appointment():
         except Exception as e:
             return jsonify({"success": False, "error": "התור לא נמצא"}), 404
 
-        # Check if appointment is at least 4 hours in the future
         from datetime import datetime
         import pytz
 
         event_start_str = event['start'].get('dateTime', event['start'].get('date'))
         event_start = datetime.fromisoformat(event_start_str.replace('Z', '+00:00'))
 
-        # Make sure we're comparing timezone-aware datetimes
+        # Compare dates in Israel timezone
         israel_tz = pytz.timezone('Asia/Jerusalem')
-        now = datetime.now(israel_tz)
+        now_israel = datetime.now(israel_tz)
 
         if event_start.tzinfo is None:
             event_start = israel_tz.localize(event_start)
+        else:
+            event_start = event_start.astimezone(israel_tz)
 
-        diff_hours = (event_start - now).total_seconds() / 3600
-
-        if diff_hours < 4:
+        # Block cancellation if appointment is today (same calendar date in Israel time)
+        if event_start.date() == now_israel.date():
+            logger.warning("[Cancel] Same-day cancellation blocked for event %s (date: %s)",
+                           event_id, event_start.date())
             return jsonify({
                 "success": False,
-                "error": "לא ניתן לבטל תור פחות מ-4 שעות לפני המועד"
-            }), 400
+                "error": "לא ניתן לבטל תור ביום התור עצמו",
+                "error_code": "CANCEL_SAME_DAY_BLOCKED"
+            }), 403
 
         # Cancel the event
         if cancel_event(event_id):
