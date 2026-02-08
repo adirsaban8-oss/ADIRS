@@ -106,7 +106,7 @@ def request_otp(phone):
         logger.info("[OTP] Generated OTP for %s: %s", phone_storage, code)
 
         # Send via ActiveTrail SMS (or mock)
-        message = f"קוד האימות שלך ב-LISHAI SIMANI: {code}\nתוקף: 5 דקות."
+        message = f"קוד אימות: {code}\nבתוקף ל-5 דק׳\nLISHAI"
         sent = send_sms(phone_storage, message)
 
         if not sent:

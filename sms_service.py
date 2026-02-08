@@ -28,13 +28,6 @@ SMS_SENDER_NAME = os.getenv("SMS_SENDER_NAME", "LISHAI SIM")  # max 11 chars
 
 ACTIVETRAIL_SMS_URL = "http://webapi.mymarketing.co.il/api/smscampaign/OperationalMessage"
 
-BUSINESS_NAME = "LISHAI SIMANI Beauty Studio"
-BUSINESS_ADDRESS = "משעול הרקפת 3, קרני שומרון"
-BUSINESS_PHONE = "051-5656295"
-
-# Waze navigation link - URL encoded address
-WAZE_LINK = "https://waze.com/ul?q=%D7%9E%D7%A9%D7%A2%D7%95%D7%9C%20%D7%94%D7%A8%D7%A7%D7%A4%D7%AA%203%20%D7%A7%D7%A8%D7%A0%D7%99%20%D7%A9%D7%95%D7%9E%D7%A8%D7%95%D7%9F&navigate=yes"
-
 
 def _to_activetrail_phone(phone):
     """
@@ -134,9 +127,7 @@ def send_booking_confirmation(booking_data):
         True if sent, False otherwise
     """
     try:
-        name = booking_data.get('name', '')
         phone = booking_data.get('phone', '')
-        service = booking_data.get('service_he', '')
         date = booking_data.get('date', '')
         time = booking_data.get('time', '')
 
@@ -146,19 +137,9 @@ def send_booking_confirmation(booking_data):
         except Exception:
             date_formatted = date
 
-        message = (
-            f"שלום {name}!\n"
-            f"התור שלך אושר בהצלחה ב-{BUSINESS_NAME}\n\n"
-            f"תאריך: {date_formatted}\n"
-            f"שעה: {time}\n"
-            f"שירות: {service}\n\n"
-            f"כתובת: {BUSINESS_ADDRESS}\n"
-            f"טלפון: {BUSINESS_PHONE}\n\n"
-            f"ניווט ב-Waze: {WAZE_LINK}\n\n"
-            f"לביטול תור, התקשרי אלינו."
-        )
+        message = f"התור נקבע ✔️\n{date_formatted} {time}\nLISHAI"
 
-        logger.info("[SMS][Booking] Sending confirmation to %s for %s at %s", name, date, time)
+        logger.info("[SMS][Booking] Sending confirmation for %s at %s", date, time)
         return send_sms(phone, message)
 
     except Exception as e:
@@ -179,9 +160,7 @@ def send_reminder_day_before(booking_data):
         True if sent, False otherwise
     """
     try:
-        name = booking_data.get('name', '')
         phone = booking_data.get('phone', '')
-        service = booking_data.get('service_he', '')
         date = booking_data.get('date', '')
         time = booking_data.get('time', '')
 
@@ -191,18 +170,9 @@ def send_reminder_day_before(booking_data):
         except Exception:
             date_formatted = date
 
-        message = (
-            f"שלום {name}!\n"
-            f"תזכורת: מחר יש לך תור ב-{BUSINESS_NAME}\n\n"
-            f"{date_formatted} בשעה {time}\n"
-            f"{service}\n\n"
-            f"{BUSINESS_ADDRESS}\n"
-            f"ניווט ב-Waze: {WAZE_LINK}\n\n"
-            f"מצפים לראותך!\n"
-            f"לביטול - התקשרי ל-{BUSINESS_PHONE}"
-        )
+        message = f"תזכורת 📅\nמחר {date_formatted} {time}\nLISHAI"
 
-        logger.info("[SMS][Reminder] Sending day-before reminder to %s", name)
+        logger.info("[SMS][Reminder] Sending day-before reminder for %s", date)
         return send_sms(phone, message)
 
     except Exception as e:
@@ -221,22 +191,19 @@ def send_reminder_morning(booking_data):
         True if sent, False otherwise
     """
     try:
-        name = booking_data.get('name', '')
         phone = booking_data.get('phone', '')
-        service = booking_data.get('service_he', '')
+        date = booking_data.get('date', '')
         time = booking_data.get('time', '')
 
-        message = (
-            f"בוקר טוב {name}!\n"
-            f"תזכורת: היום יש לך תור ב-{BUSINESS_NAME}\n\n"
-            f"בשעה {time}\n"
-            f"{service}\n\n"
-            f"{BUSINESS_ADDRESS}\n"
-            f"ניווט ב-Waze: {WAZE_LINK}\n\n"
-            f"נתראה בקרוב!"
-        )
+        try:
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+            date_formatted = date_obj.strftime('%d/%m/%Y')
+        except Exception:
+            date_formatted = date
 
-        logger.info("[SMS][Reminder] Sending morning reminder to %s", name)
+        message = f"תזכורת 📅\nמחר {date_formatted} {time}\nLISHAI"
+
+        logger.info("[SMS][Reminder] Sending morning reminder for %s", date)
         return send_sms(phone, message)
 
     except Exception as e:
@@ -257,26 +224,11 @@ def send_cancellation_confirmation(booking_data):
         True if sent, False otherwise
     """
     try:
-        name = booking_data.get('name', '')
         phone = booking_data.get('phone', '')
-        date = booking_data.get('date', '')
-        time = booking_data.get('time', '')
 
-        try:
-            date_obj = datetime.strptime(date, '%Y-%m-%d')
-            date_formatted = date_obj.strftime('%d/%m/%Y')
-        except Exception:
-            date_formatted = date
+        message = "התור בוטל ✔️\nLISHAI"
 
-        message = (
-            f"שלום {name},\n"
-            f"התור שלך ל-{date_formatted} בשעה {time} בוטל בהצלחה.\n\n"
-            f"להזמנת תור חדש:\n"
-            f"{BUSINESS_PHONE}\n\n"
-            f"{BUSINESS_NAME}"
-        )
-
-        logger.info("[SMS][Cancel] Sending cancellation to %s", name)
+        logger.info("[SMS][Cancel] Sending cancellation")
         return send_sms(phone, message)
 
     except Exception as e:
