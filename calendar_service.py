@@ -5,6 +5,7 @@ Handles all interactions with Google Calendar API
 
 import os
 import json
+import logging
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -13,14 +14,29 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # Google Calendar API scopes
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 # Load configuration from environment variables
-CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
+CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', '')
+if not CALENDAR_ID or CALENDAR_ID == 'primary':
+    logger.warning(
+        "GOOGLE_CALENDAR_ID is %s. Service accounts cannot access 'primary'. "
+        "Set GOOGLE_CALENDAR_ID to the target calendar's email address.",
+        repr(CALENDAR_ID) if CALENDAR_ID else 'missing'
+    )
 
 # Cached service instance
 _calendar_service = None
+
+# 403 error message used across this module
+_PERMISSION_MSG = (
+    "403 Forbidden – the service account does not have access to calendar '%s'. "
+    "Fix: open Google Calendar > Settings for '%s' > Share with specific people > "
+    "add the service account email with 'Make changes to events' permission."
+)
 
 
 def get_calendar_service():
@@ -46,8 +62,7 @@ def get_calendar_service():
         )
 
     # Log for debugging (first 50 chars only for security)
-    print(f"GOOGLE_CREDENTIALS_JSON found, length: {len(credentials_json)}")
-    print(f"First 50 chars: {credentials_json[:50]}...")
+    logger.info("GOOGLE_CREDENTIALS_JSON found, length: %d", len(credentials_json))
 
     try:
         # Parse JSON string to dictionary
@@ -59,9 +74,7 @@ def get_calendar_service():
         if missing:
             raise Exception(f"Missing required fields in credentials: {missing}")
 
-        print(f"Credentials type: {credentials_info.get('type')}")
-        print(f"Project ID: {credentials_info.get('project_id')}")
-        print(f"Client email: {credentials_info.get('client_email')}")
+        logger.info("Service account: %s", credentials_info.get('client_email'))
 
         # Create credentials object from dictionary (NOT from file!)
         credentials = service_account.Credentials.from_service_account_info(
@@ -70,9 +83,13 @@ def get_calendar_service():
         )
 
         # Build the calendar service
-        _calendar_service = build('calendar', 'v3', credentials=credentials)
-        print("Google Calendar service created successfully!")
+        service = build('calendar', 'v3', credentials=credentials)
 
+        # Verify we can actually access the target calendar
+        _verify_calendar_access(service)
+
+        _calendar_service = service
+        logger.info("Google Calendar service created and verified successfully!")
         return _calendar_service
 
     except json.JSONDecodeError as e:
@@ -83,6 +100,30 @@ def get_calendar_service():
         )
     except Exception as e:
         raise Exception(f"Failed to create calendar service: {str(e)}")
+
+
+def _verify_calendar_access(service):
+    """
+    Verify that the service account can access CALENDAR_ID.
+    Raises a clear error when permissions are missing.
+    """
+    if not CALENDAR_ID:
+        raise Exception(
+            "GOOGLE_CALENDAR_ID is not set. "
+            "Set it to the calendar owner's email address (e.g. user@gmail.com)."
+        )
+    try:
+        service.calendars().get(calendarId=CALENDAR_ID).execute()
+    except HttpError as e:
+        if e.resp.status == 403:
+            logger.error(_PERMISSION_MSG, CALENDAR_ID, CALENDAR_ID)
+            raise Exception(_PERMISSION_MSG % (CALENDAR_ID, CALENDAR_ID))
+        if e.resp.status == 404:
+            raise Exception(
+                f"Calendar '{CALENDAR_ID}' not found. "
+                "Check that GOOGLE_CALENDAR_ID is correct."
+            )
+        raise
 
 
 def get_busy_slots(date_str):
@@ -131,6 +172,9 @@ def get_busy_slots(date_str):
         return busy_slots
 
     except HttpError as e:
+        if e.resp.status == 403:
+            logger.error(_PERMISSION_MSG, CALENDAR_ID, CALENDAR_ID)
+            raise Exception(_PERMISSION_MSG % (CALENDAR_ID, CALENDAR_ID))
         raise Exception(f"Google Calendar API error: {str(e)}")
     except Exception as e:
         raise Exception(f"Failed to get busy slots: {str(e)}")
@@ -240,6 +284,9 @@ def create_event(booking_data):
         return created_event
 
     except HttpError as e:
+        if e.resp.status == 403:
+            logger.error(_PERMISSION_MSG, CALENDAR_ID, CALENDAR_ID)
+            raise Exception(_PERMISSION_MSG % (CALENDAR_ID, CALENDAR_ID))
         raise Exception(f"Google Calendar API error: {str(e)}")
     except Exception as e:
         raise Exception(f"Failed to create event: {str(e)}")
@@ -290,7 +337,7 @@ def filter_available_slots(date_str, all_slots, service_duration=30):
 
     except Exception as e:
         # If calendar service fails, return all slots (graceful degradation)
-        print(f"Warning: Could not filter busy slots: {str(e)}")
+        logger.warning("Could not filter busy slots: %s", e)
         return all_slots
 
 
@@ -310,15 +357,18 @@ def cancel_event(event_id):
             calendarId=CALENDAR_ID,
             eventId=event_id
         ).execute()
-        print(f"Event {event_id} cancelled successfully")
+        logger.info("Event %s cancelled successfully", event_id)
         return True
 
     except HttpError as e:
         if e.resp.status == 404:
-            print(f"Event {event_id} not found (may already be cancelled)")
+            logger.info("Event %s not found (may already be cancelled)", event_id)
             return True  # Treat as success if already gone
-        print(f"Google Calendar API error cancelling event: {str(e)}")
+        if e.resp.status == 403:
+            logger.error(_PERMISSION_MSG, CALENDAR_ID, CALENDAR_ID)
+        else:
+            logger.error("Google Calendar API error cancelling event: %s", e)
         return False
     except Exception as e:
-        print(f"Failed to cancel event: {str(e)}")
+        logger.error("Failed to cancel event: %s", e)
         return False

@@ -5,15 +5,19 @@ Sends automatic reminders to customers before their appointments
 
 import os
 import json
+import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Email configuration
 SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
@@ -23,7 +27,7 @@ EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Use App Password for Gmail
 
 # Google Calendar configuration
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
+CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', '')
 
 
 def get_calendar_service():
@@ -75,8 +79,19 @@ def get_upcoming_appointments(hours_ahead=24):
 
         return events_result.get('items', [])
 
+    except HttpError as e:
+        if e.resp.status == 403:
+            logger.error(
+                "403 Forbidden – service account cannot access calendar '%s'. "
+                "Share the calendar with the service account email and grant "
+                "'See all event details' permission.",
+                CALENDAR_ID,
+            )
+        else:
+            logger.error("Google Calendar API error: %s", e)
+        return []
     except Exception as e:
-        print(f"Error fetching appointments: {e}")
+        logger.error("Error fetching appointments: %s", e)
         return []
 
 
