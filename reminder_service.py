@@ -25,6 +25,9 @@ SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 EMAIL_ADDRESS = os.getenv('EMAIL_ADDRESS')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')  # Use App Password for Gmail
 
+# Email feature flag
+EMAIL_ENABLED = os.getenv('EMAIL_ENABLED', 'false').lower() == 'true'
+
 # Google Calendar configuration
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', '')
@@ -150,12 +153,15 @@ def send_email_reminder(to_email, customer_name, service, date, time, reminder_t
         time: Appointment time
         reminder_type: 'day_before' or 'morning_of'
     """
+    if not EMAIL_ENABLED:
+        return False
+
     if not EMAIL_ADDRESS or not EMAIL_PASSWORD:
-        print("Email credentials not configured")
+        logger.warning("Email credentials not configured")
         return False
 
     if not to_email:
-        print(f"No email address for customer: {customer_name}")
+        logger.debug("No email address for customer: %s", customer_name)
         return False
 
     try:

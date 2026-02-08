@@ -24,10 +24,16 @@ logger = logging.getLogger(__name__)
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(line_buffering=True)
 
+# Feature flag – set EMAIL_ENABLED=true in env to re-enable
+EMAIL_ENABLED = os.getenv('EMAIL_ENABLED', 'false').lower() == 'true'
+
 # SendGrid configuration
 SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
 EMAIL_FROM = os.getenv('EMAIL_FROM', '')
 EMAIL_SENDER_NAME = os.getenv('EMAIL_SENDER_NAME', 'LISHAI SIMANI')
+
+if not EMAIL_ENABLED:
+    logger.info("Email sending is DISABLED (EMAIL_ENABLED != true)")
 
 # Business info
 BUSINESS_NAME = 'LISHAI SIMANI'
@@ -180,6 +186,9 @@ def send_email(to_email, subject, html_content):
     Send email using SendGrid HTTP API.
     Returns True on success, False on failure.
     """
+    if not EMAIL_ENABLED:
+        return False
+
     logger.info("=" * 50)
     logger.info("SENDGRID EMAIL - SEND ATTEMPT STARTED")
     logger.info(f"To: {to_email}")
@@ -278,6 +287,9 @@ def send_email(to_email, subject, html_content):
 
 def send_booking_confirmation(booking_data):
     """Send booking confirmation email to customer."""
+    if not EMAIL_ENABLED:
+        return False
+
     logger.info("=" * 50)
     logger.info("BOOKING CONFIRMATION EMAIL TRIGGERED")
     logger.info(f"Customer: {booking_data.get('name', 'N/A')}")
@@ -295,6 +307,9 @@ def send_booking_confirmation(booking_data):
 
 def send_reminder_day_before(booking_data):
     """Send reminder email one day before the appointment."""
+    if not EMAIL_ENABLED:
+        return False
+
     logger.info("DAY-BEFORE REMINDER EMAIL TRIGGERED")
     logger.info(f"Customer: {booking_data.get('name', 'N/A')} - {booking_data.get('email', 'N/A')}")
     sys.stdout.flush()
@@ -308,6 +323,9 @@ def send_reminder_day_before(booking_data):
 
 def send_reminder_morning(booking_data):
     """Send reminder email on the morning of the appointment."""
+    if not EMAIL_ENABLED:
+        return False
+
     logger.info("MORNING REMINDER EMAIL TRIGGERED")
     logger.info(f"Customer: {booking_data.get('name', 'N/A')} - {booking_data.get('email', 'N/A')}")
     sys.stdout.flush()

@@ -52,22 +52,22 @@ from email_service import (
 # Import phone utilities (centralized E.164 normalization)
 from phone_utils import normalize_israeli_phone
 
-# Import Twilio SMS service
+# Import ActiveTrail SMS service
 try:
-    from twilio_sms_service import (
+    from sms_service import (
         send_booking_confirmation as send_sms_booking_confirmation,
         send_reminder_day_before as send_sms_reminder_day_before,
         send_reminder_morning as send_sms_reminder_morning
     )
     SMS_SERVICE_AVAILABLE = True
 except Exception as sms_error:
-    print(f"[SMS] Twilio service not available: {sms_error}")
+    print(f"[SMS] SMS service not available: {sms_error}")
     SMS_SERVICE_AVAILABLE = False
 
-# Import Twilio OTP service (database version)
+# Import OTP service (database + ActiveTrail SMS)
 try:
     from db_service import init_db_pool, is_db_available, run_migrations
-    from twilio_otp import request_otp, verify_otp
+    from otp_service import request_otp, verify_otp
     from customer_service import (
         customer_exists, get_customer_by_phone, create_customer,
         get_all_customers, search_customers, get_customer_count,
@@ -79,14 +79,9 @@ try:
         get_appointments_for_date, update_google_event_id
     )
     DB_ENABLED = True
-    print("[Database] Using PostgreSQL database with Twilio SMS")
+    print("[Database] Using PostgreSQL database with ActiveTrail SMS")
 except Exception as db_import_error:
     print(f"[Database] PostgreSQL not available, using legacy mode: {db_import_error}")
-    # Fallback to old WhatsApp OTP if Twilio not available
-    try:
-        from whatsapp_otp import request_otp, verify_otp
-    except:
-        print("[OTP] No OTP service available")
     DB_ENABLED = False
 
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -527,7 +522,7 @@ def health():
         "timestamp": datetime.now(ISRAEL_TZ).isoformat(),
         "email": bool(os.getenv('SENDGRID_API_KEY')),
         "calendar": bool(os.getenv('GOOGLE_CREDENTIALS') or os.getenv('GOOGLE_CREDENTIALS_JSON')),
-        "whatsapp": os.getenv('WHATSAPP_ENABLED', 'false').lower() == 'true',
+        "sms": os.getenv('SMS_ENABLED', 'false').lower() == 'true',
     }
     return jsonify(health_status), 200
 
@@ -751,7 +746,7 @@ def book_appointment():
             except Exception as cal_error:
                 print(f"Failed to create calendar event: {str(cal_error)}")
 
-        # Send confirmation email via SendGrid HTTP API
+        # Send confirmation email (skipped silently if EMAIL_ENABLED != true)
         email_sent = False
         try:
             email_sent = send_booking_confirmation(booking_data)
@@ -759,11 +754,10 @@ def book_appointment():
             print(f"Failed to send confirmation email: {str(email_error)}")
 
         # Send SMS confirmation in background (non-blocking)
-        sms_enabled = os.getenv("TWILIO_ENABLED", "false").lower() == "true"
-        print(f"[Twilio] SMS enabled={sms_enabled}, phone={booking_data.get('phone')}")
+        sms_enabled = os.getenv("SMS_ENABLED", "false").lower() == "true"
         if sms_enabled and SMS_SERVICE_AVAILABLE:
             try:
-                print(f"[Twilio] Sending booking confirmation SMS to {booking_data.get('name')}...")
+                print(f"[SMS] Sending booking confirmation SMS to {booking_data.get('name')}...")
                 sms_thread = threading.Thread(
                     target=send_sms_booking_confirmation,
                     args=(booking_data,),
@@ -771,9 +765,7 @@ def book_appointment():
                 )
                 sms_thread.start()
             except Exception as sms_error:
-                print(f"[Twilio] Failed to start SMS thread: {str(sms_error)}")
-        else:
-            print("[Twilio] Skipping SMS - TWILIO_ENABLED is not true or service unavailable")
+                print(f"[SMS] Failed to start SMS thread: {str(sms_error)}")
 
         return jsonify({
             "success": True,
@@ -894,7 +886,7 @@ def cancel_appointment():
 
 @app.route('/api/otp/request', methods=['POST'])
 def otp_request():
-    """Send OTP to a phone number via WhatsApp (or mock)."""
+    """Send OTP to a phone number via SMS (or mock)."""
     data = request.json or {}
     phone = data.get('phone', '').strip()
 
