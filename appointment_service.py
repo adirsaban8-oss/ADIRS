@@ -222,6 +222,31 @@ def cancel_appointment(appointment_id):
         return None
 
 
+def cancel_appointment_by_event_id(google_event_id):
+    """
+    Cancel a DB appointment row by its Google Calendar event ID.
+    Keeps DB in sync after Calendar event deletion.
+    """
+    try:
+        result = execute_query(
+            """
+            UPDATE appointments
+            SET status = 'cancelled', updated_at = NOW()
+            WHERE google_event_id = %s AND status = 'active'
+            RETURNING id
+            """,
+            (google_event_id,),
+            fetch_one=True
+        )
+        if result:
+            logger.info("[DB] Marked appointment %s as cancelled (event_id=%s)",
+                        result['id'], google_event_id)
+        return result
+    except Exception as e:
+        logger.error("[DB] Error cancelling by event_id %s: %s", google_event_id, e)
+        return None
+
+
 def complete_appointment(appointment_id):
     """
     Mark an appointment as completed.

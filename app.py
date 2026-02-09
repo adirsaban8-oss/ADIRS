@@ -80,7 +80,7 @@ try:
     from appointment_service import (
         create_appointment, get_customer_future_appointments,
         has_active_future_appointment, count_active_future_appointments, cancel_appointment,
-        get_appointments_for_date, update_google_event_id
+        cancel_appointment_by_event_id, get_appointments_for_date, update_google_event_id
     )
     DB_ENABLED = True
     print("[Database] Using PostgreSQL database with ActiveTrail SMS")
@@ -213,7 +213,8 @@ def normalize_phone(phone):
 
 def get_appointments_by_phone(phone):
     """Query Google Calendar LIVE for future events belonging to a phone number.
-    No caching — always returns current Calendar state."""
+    No caching — always returns current Calendar state.
+    Filters: confirmed status only, future only, strict phone match."""
     phone_norm = normalize_phone(phone)
     now = datetime.now(ISRAEL_TZ)
 
@@ -222,6 +223,9 @@ def get_appointments_by_phone(phone):
 
         time_min = now.isoformat()
         time_max = (now + timedelta(days=60)).isoformat()
+
+        logger.info("[MyAppointments] Querying calendar=%s timeMin=%s timeMax=%s phone=%s",
+                    CALENDAR_ID, time_min, time_max, phone_norm)
 
         events_result = service.events().list(
             calendarId=CALENDAR_ID,
@@ -233,9 +237,15 @@ def get_appointments_by_phone(phone):
         ).execute()
 
         events = events_result.get('items', [])
+        logger.info("[MyAppointments] Google returned %d raw events", len(events))
+
         appointments = []
 
         for event in events:
+            # Skip cancelled events explicitly
+            if event.get('status') == 'cancelled':
+                continue
+
             description = event.get('description', '')
             if not description:
                 continue
@@ -257,6 +267,10 @@ def get_appointments_by_phone(phone):
             event_start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
             event_start_il = event_start.astimezone(ISRAEL_TZ)
 
+            # Skip past events (safety — should already be filtered by timeMin)
+            if event_start_il <= now:
+                continue
+
             days_hebrew = ['שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת', 'ראשון']
             day_name = days_hebrew[event_start_il.weekday()]
 
@@ -272,7 +286,8 @@ def get_appointments_by_phone(phone):
                 'datetime_raw': event_start_il.isoformat(),
             })
 
-        logger.info("[MyAppointments] Fetched %d appointments for %s", len(appointments), phone_norm)
+        logger.info("[MyAppointments] Returning %d appointments for %s (from %d raw events)",
+                    len(appointments), phone_norm, len(events))
         return appointments
 
     except Exception as e:
@@ -658,8 +673,12 @@ def book_appointment():
                     return jsonify({"error": "שגיאה ביצירת משתמש. נסי שוב."}), 500
 
             # Check if customer has reached max future appointments (BUSINESS RULE: max 2)
-            active_count = count_active_future_appointments(customer['id'])
-            if active_count >= 2:
+            # SOURCE OF TRUTH: Google Calendar (NOT database)
+            live_appointments = get_appointments_by_phone(data['phone'])
+            live_count = len(live_appointments)
+            logger.info("[BookingGuard] Phone %s has %d live Calendar appointments",
+                        data['phone'], live_count)
+            if live_count >= 2:
                 return jsonify({
                     "error": "כבר יש לך 2 תורים עתידיים. ניתן להזמין תור חדש רק לאחר שאחד מהם יעבור או יבוטל."
                 }), 409
@@ -884,8 +903,14 @@ def cancel_appointment():
                 "error_code": "CANCEL_SAME_DAY_BLOCKED"
             }), 403
 
-        # Cancel the event
+        # Cancel the event in Google Calendar
         if cancel_event(event_id):
+            # Also mark cancelled in DB (defensive sync)
+            if DB_ENABLED:
+                try:
+                    cancel_appointment_by_event_id(event_id)
+                except Exception as db_err:
+                    logger.warning("[Cancel] Calendar cancelled but DB sync failed: %s", db_err)
             return jsonify({"success": True, "message": "התור בוטל בהצלחה"})
         else:
             return jsonify({"success": False, "error": "שגיאה בביטול התור"}), 500
