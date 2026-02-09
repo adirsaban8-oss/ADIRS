@@ -415,6 +415,32 @@ def run_migrations():
             """,
             """
             CREATE INDEX IF NOT EXISTS idx_otp_expires ON otp_codes(expires_at)
+            """,
+
+            # Reminder deduplication table — guarantees at-most-once per (event, type)
+            """
+            CREATE TABLE IF NOT EXISTS reminder_sends (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                google_event_id VARCHAR(255) NOT NULL,
+                reminder_type VARCHAR(20) NOT NULL CHECK (reminder_type IN ('DAY_BEFORE', 'DAY_OF')),
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                error_message TEXT,
+                created_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT uq_reminder_event_type UNIQUE (google_event_id, reminder_type)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_reminder_sends_event ON reminder_sends(google_event_id)
+            """,
+
+            # Safe upgrade path if table already exists from a prior deploy
+            """
+            DO $$ BEGIN
+                ALTER TABLE reminder_sends ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'pending';
+                ALTER TABLE reminder_sends ADD COLUMN IF NOT EXISTS error_message TEXT;
+                ALTER TABLE reminder_sends ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();
+            EXCEPTION WHEN OTHERS THEN NULL;
+            END $$
             """
         ]
 

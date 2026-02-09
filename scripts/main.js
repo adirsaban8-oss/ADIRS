@@ -885,6 +885,9 @@ bookingForm.addEventListener('submit', async (e) => {
             showModal({ ...bookingData, serviceKey: serviceKey });
             bookingForm.reset();
             timeSlotsContainer.innerHTML = '<p style="grid-column: 1/-1; text-align: center; color: var(--color-text-tertiary);">בחרי תאריך קודם</p>';
+            // Refresh with retry until new appointment appears in Google Calendar
+            // Pass date+time as fallback identifiers in case event_id is missing
+            MyAppointments.refreshUntilSynced(result.event_id || null, true, bookingData.date, bookingData.time);
         } else {
             alert(result.error || 'אירעה שגיאה. נסי שוב.');
         }
@@ -1085,7 +1088,8 @@ const MyAppointments = {
         // Normalize to +972 format for backend
         const normalizedPhone = PhoneUtils.normalize(phone) || phone.trim().replace(/[-\s]/g, '');
         const response = await fetch(
-            `${CONFIG.API_BASE}/api/my-appointments?phone=${encodeURIComponent(normalizedPhone)}`
+            `${CONFIG.API_BASE}/api/my-appointments?phone=${encodeURIComponent(normalizedPhone)}&_t=${Date.now()}`,
+            { cache: 'no-store' }
         );
         if (!response.ok) {
             const err = await response.json();
@@ -1186,7 +1190,7 @@ const MyAppointments = {
 
             if (response.ok && data.success) {
                 alert('התור בוטל בהצלחה');
-                this.refresh();
+                this.refreshUntilSynced(eventId, false);
             } else {
                 alert(data.error || 'שגיאה בביטול התור');
             }
@@ -1233,6 +1237,63 @@ const MyAppointments = {
 
     refresh() {
         this.loadAppointments();
+    },
+
+    /**
+     * Refresh with exponential backoff until Google Calendar state matches expectation.
+     * @param {string|null} eventId - The event to check for
+     * @param {boolean} shouldExist - true after booking (wait for it to appear), false after cancel (wait for removal)
+     * @param {string} [fallbackDate] - YYYY-MM-DD fallback when eventId is missing (booking)
+     * @param {string} [fallbackTime] - HH:MM fallback when eventId is missing (booking)
+     */
+    async refreshUntilSynced(eventId, shouldExist, fallbackDate, fallbackTime) {
+        const delays = [500, 1000, 2000];
+        const identity = UserIdentity.get();
+        if (!identity) return;
+
+        const hasFallback = !eventId && fallbackDate && fallbackTime;
+
+        this.showLoading();
+
+        for (let attempt = 0; attempt <= delays.length; attempt++) {
+            if (attempt > 0) {
+                await new Promise(resolve => setTimeout(resolve, delays[attempt - 1]));
+            }
+            try {
+                const data = await this.fetchAppointments(identity.phone);
+                const appointments = data.appointments || [];
+
+                let synced;
+                if (eventId) {
+                    // Primary path: match by event_id
+                    const found = appointments.some(a => a.event_id === eventId);
+                    synced = shouldExist ? found : !found;
+                } else if (hasFallback && shouldExist) {
+                    // Fallback: match by date+time (booking without event_id)
+                    const found = appointments.some(a => a.iso_date === fallbackDate && a.time === fallbackTime);
+                    synced = found;
+                } else {
+                    // No identifier available — accept first fetch
+                    synced = true;
+                }
+
+                if (synced || attempt === delays.length) {
+                    if (appointments.length > 0) {
+                        this.showResults(identity.name, appointments);
+                        this.updateHomeBubble(appointments[0]);
+                    } else {
+                        this.showEmpty(identity.name);
+                        this.hideHomeBubble();
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error('[MyAppointments] Retry attempt', attempt, 'failed:', e);
+                if (attempt === delays.length) {
+                    this.loadAppointments();
+                }
+            }
+        }
     },
 
     reset() {

@@ -26,6 +26,9 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 import pytz
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load .env ONLY in local development. On Railway, env vars are set by the platform.
 if not os.getenv('RAILWAY_ENVIRONMENT'):
@@ -193,26 +196,11 @@ def admin_required(f):
 
 # ============== REMINDER SCHEDULER ==============
 
-# Store sent reminders with expiration (key: reminder_key, value: expiration_date)
-# Entries are cleaned up after their event date passes
-sent_reminders = {}
-
 # Israel timezone for correct reminder timing
 ISRAEL_TZ = pytz.timezone('Asia/Jerusalem')
 
 
-def cleanup_old_reminders():
-    """Remove reminder keys for past events to prevent memory leak."""
-    global sent_reminders
-    today = datetime.now(ISRAEL_TZ).date()
-    sent_reminders = {k: v for k, v in sent_reminders.items() if v >= today}
-
-
 # ============== MY APPOINTMENTS ==============
-
-# Cache for appointment queries: { phone_normalized: { "data": [...], "timestamp": datetime } }
-_appointments_cache = {}
-APPOINTMENTS_CACHE_TTL = 300  # 5 minutes
 
 
 def normalize_phone(phone):
@@ -224,16 +212,10 @@ def normalize_phone(phone):
 
 
 def get_appointments_by_phone(phone):
-    """Query Google Calendar for future events belonging to a phone number."""
-    global _appointments_cache
-
+    """Query Google Calendar LIVE for future events belonging to a phone number.
+    No caching — always returns current Calendar state."""
     phone_norm = normalize_phone(phone)
     now = datetime.now(ISRAEL_TZ)
-
-    # Check cache
-    cached = _appointments_cache.get(phone_norm)
-    if cached and (now - cached['timestamp']).total_seconds() < APPOINTMENTS_CACHE_TTL:
-        return cached['data']
 
     try:
         service = get_calendar_service()
@@ -290,93 +272,38 @@ def get_appointments_by_phone(phone):
                 'datetime_raw': event_start_il.isoformat(),
             })
 
-        _appointments_cache[phone_norm] = {
-            'data': appointments,
-            'timestamp': now
-        }
-
+        logger.info("[MyAppointments] Fetched %d appointments for %s", len(appointments), phone_norm)
         return appointments
 
     except Exception as e:
-        print(f"Error fetching appointments by phone: {str(e)}")
+        logger.error("[MyAppointments] Error fetching for %s: %s", phone_norm, e)
         return []
 
 
 def check_and_send_reminders():
     """
     Check for upcoming appointments and send reminders.
-    Called by the scheduler. Works with both DB and Calendar.
+    SOURCE OF TRUTH: Google Calendar — only events that currently exist get reminders.
+    DEDUP: PostgreSQL reminder_sends table guarantees at-most-once per (event, type).
+    LOCK: PostgreSQL advisory lock ensures only one worker runs at a time.
     """
+    now = datetime.now(ISRAEL_TZ)
+
+    # Only run at reminder hours: 20:00 (day-before) or 08:00 (morning-of)
+    if now.hour not in (8, 20):
+        return
+
+    reminder_type = 'DAY_BEFORE' if now.hour == 20 else 'DAY_OF'
+    target_date = (now + timedelta(days=1)).date() if now.hour == 20 else now.date()
+
+    logger.info("[Reminders] Scheduler triggered: hour=%d, type=%s, target=%s",
+                now.hour, reminder_type, target_date)
+
+    # ---- Step 1: Query Google Calendar (single source of truth) ----
     try:
-        # Clean up old reminder keys first
-        cleanup_old_reminders()
-
-        now = datetime.now(ISRAEL_TZ)
-        today = now.date()
-        tomorrow = today + timedelta(days=1)
-
-        # Try database first if available
-        if DB_ENABLED:
-            try:
-                from appointment_service import get_appointments_needing_reminders
-                reminders_data = get_appointments_needing_reminders()
-
-                # Send day-before reminders (20:00)
-                if now.hour == 20:
-                    for apt in reminders_data.get('day_before', []):
-                        reminder_key = f"day_before_{apt['id']}"
-                        if reminder_key not in sent_reminders:
-                            booking_data = {
-                                'name': apt['customer_name'],
-                                'phone': apt['customer_phone'],
-                                'email': apt['customer_email'],
-                                'service_he': apt['service_name_he'],
-                                'date': apt['datetime'].strftime('%Y-%m-%d'),
-                                'time': apt['datetime'].strftime('%H:%M'),
-                            }
-                            # Send email reminder
-                            send_reminder_day_before(booking_data)
-                            # Send SMS reminder if enabled
-                            if SMS_SERVICE_AVAILABLE:
-                                send_sms_reminder_day_before(booking_data)
-                            sent_reminders[reminder_key] = apt['datetime'].date()
-                            print(f"[DB] Sent day-before reminder to {apt['customer_email']}")
-
-                # Send morning reminders (08:00)
-                if now.hour == 8:
-                    for apt in reminders_data.get('morning', []):
-                        reminder_key = f"morning_{apt['id']}"
-                        if reminder_key not in sent_reminders:
-                            booking_data = {
-                                'name': apt['customer_name'],
-                                'phone': apt['customer_phone'],
-                                'email': apt['customer_email'],
-                                'service_he': apt['service_name_he'],
-                                'date': apt['datetime'].strftime('%Y-%m-%d'),
-                                'time': apt['datetime'].strftime('%H:%M'),
-                            }
-                            # Send email reminder
-                            send_reminder_morning(booking_data)
-                            # Send SMS reminder if enabled
-                            if SMS_SERVICE_AVAILABLE:
-                                send_sms_reminder_morning(booking_data)
-                            sent_reminders[reminder_key] = apt['datetime'].date()
-                            print(f"[DB] Sent morning reminder to {apt['customer_email']}")
-
-                return  # Successfully used database
-
-            except Exception as db_error:
-                print(f"[Reminders] DB error, falling back to Calendar: {str(db_error)}")
-
-        # Fallback to Calendar-based reminders (legacy mode)
         service = get_calendar_service()
-        now = datetime.now(ISRAEL_TZ)
-        today = now.date()
-        tomorrow = today + timedelta(days=1)
-
-        # Get events for today and tomorrow
-        time_min = datetime.combine(today, datetime.min.time()).isoformat() + 'Z'
-        time_max = datetime.combine(tomorrow + timedelta(days=1), datetime.min.time()).isoformat() + 'Z'
+        time_min = ISRAEL_TZ.localize(datetime.combine(target_date, datetime.min.time())).isoformat()
+        time_max = ISRAEL_TZ.localize(datetime.combine(target_date + timedelta(days=1), datetime.min.time())).isoformat()
 
         events_result = service.events().list(
             calendarId=CALENDAR_ID,
@@ -385,73 +312,163 @@ def check_and_send_reminders():
             singleEvents=True,
             orderBy='startTime'
         ).execute()
-
         events = events_result.get('items', [])
-
-        for event in events:
-            # Parse event details from description
-            description = event.get('description', '')
-            if not description:
-                continue
-
-            lines = description.strip().split('\n')
-            if len(lines) < 3:
-                continue
-
-            # Extract email from description
-            email = None
-            for line in lines:
-                if '@' in line:
-                    email = line.strip()
-                    break
-
-            if not email:
-                continue
-
-            # Get event start time
-            start_str = event['start'].get('dateTime', '')
-            if not start_str:
-                continue
-
-            event_start = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
-            event_date = event_start.date()
-            event_time = event_start.strftime('%H:%M')
-
-            # Create booking data for email
-            summary = event.get('summary', '')
-            name = summary.split(' - ')[0] if ' - ' in summary else summary
-            service_name = summary.split(' - ')[1] if ' - ' in summary else lines[0]
-
-            booking_data = {
-                'name': name,
-                'email': email,
-                'service_he': service_name,
-                'service': service_name,
-                'date': event_date.strftime('%Y-%m-%d'),
-                'time': event_time,
-                'duration': 60
-            }
-
-            event_id = event.get('id', '')
-
-            # Check if we need to send day-before reminder (20:00 the day before)
-            if event_date == tomorrow and now.hour == 20:
-                reminder_key = f"day_before_{event_id}"
-                if reminder_key not in sent_reminders:
-                    send_reminder_day_before(booking_data)
-                    sent_reminders[reminder_key] = event_date
-                    print(f"[Calendar] Sent day-before reminder to {email}")
-
-            # Check if we need to send morning reminder (08:00 same day)
-            if event_date == today and now.hour == 8:
-                reminder_key = f"morning_{event_id}"
-                if reminder_key not in sent_reminders:
-                    send_reminder_morning(booking_data)
-                    sent_reminders[reminder_key] = event_date
-                    print(f"[Calendar] Sent morning reminder to {email}")
-
     except Exception as e:
-        print(f"Error checking reminders: {str(e)}")
+        logger.error("[Reminders] Google Calendar query failed: %s", e)
+        return
+
+    logger.info("[Reminders] Found %d calendar events for %s", len(events), target_date)
+
+    # ---- Step 2: Parse events into reminder candidates ----
+    candidates = []
+    for event in events:
+        description = event.get('description', '')
+        if not description:
+            continue
+        lines = [l.strip() for l in description.strip().split('\n') if l.strip()]
+        if len(lines) < 3:
+            continue
+        event_id = event.get('id', '')
+        if not event_id:
+            continue
+
+        email = ''
+        for line in lines:
+            if '@' in line:
+                email = line.strip()
+                break
+
+        start_str = event['start'].get('dateTime', '')
+        if not start_str:
+            continue
+        event_start = datetime.fromisoformat(start_str.replace('Z', '+00:00')).astimezone(ISRAEL_TZ)
+
+        candidates.append({
+            'event_id': event_id,
+            'name': lines[1] if len(lines) >= 2 else '',
+            'phone': lines[2] if len(lines) >= 3 else '',
+            'email': email,
+            'service_he': lines[0],
+            'date': event_start.strftime('%Y-%m-%d'),
+            'time': event_start.strftime('%H:%M'),
+        })
+
+    if not candidates:
+        logger.info("[Reminders] No valid events to process")
+        return
+
+    # ---- Step 3 + 4: Dedup via DB + send with status tracking ----
+    sent = 0
+    skipped = 0
+    failed = 0
+
+    if DB_ENABLED:
+        try:
+            from db_service import get_db_connection
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+
+                # Advisory lock — only one worker runs reminders at a time
+                cur.execute("SELECT pg_try_advisory_lock(738291)")
+                if not cur.fetchone()[0]:
+                    logger.info("[Reminders] Lock held by another worker, skipping entire run")
+                    cur.close()
+                    return
+
+                logger.info("[Reminders] Advisory lock acquired")
+
+                try:
+                    for c in candidates:
+                        # Step 3a: INSERT with status='pending', skip on UNIQUE conflict
+                        cur.execute("""
+                            INSERT INTO reminder_sends (google_event_id, reminder_type, status)
+                            VALUES (%s, %s, 'pending')
+                            ON CONFLICT (google_event_id, reminder_type) DO NOTHING
+                        """, (c['event_id'], reminder_type))
+                        conn.commit()
+
+                        owns_send = cur.rowcount > 0
+
+                        if not owns_send:
+                            # Conflict — check if stale 'pending' from a crashed worker
+                            cur.execute("""
+                                UPDATE reminder_sends
+                                SET created_at = NOW(), status = 'pending', error_message = NULL
+                                WHERE google_event_id = %s AND reminder_type = %s
+                                  AND status = 'pending'
+                                  AND created_at < NOW() - INTERVAL '10 minutes'
+                                RETURNING 1
+                            """, (c['event_id'], reminder_type))
+                            conn.commit()
+                            owns_send = cur.rowcount > 0
+
+                            if not owns_send:
+                                skipped += 1
+                                continue
+
+                        # Step 3b: Attempt to send
+                        try:
+                            if reminder_type == 'DAY_BEFORE':
+                                send_reminder_day_before(c)
+                                if SMS_SERVICE_AVAILABLE:
+                                    send_sms_reminder_day_before(c)
+                            else:
+                                send_reminder_morning(c)
+                                if SMS_SERVICE_AVAILABLE:
+                                    send_sms_reminder_morning(c)
+
+                            # Step 3c: Mark as sent
+                            cur.execute("""
+                                UPDATE reminder_sends SET status = 'sent'
+                                WHERE google_event_id = %s AND reminder_type = %s
+                            """, (c['event_id'], reminder_type))
+                            conn.commit()
+                            sent += 1
+                            logger.info("[Reminders] Sent %s to %s (%s)",
+                                        reminder_type, c['name'], c['phone'])
+
+                        except Exception as send_err:
+                            # Step 3d: Mark as failed with error message
+                            err_msg = str(send_err)[:500]
+                            cur.execute("""
+                                UPDATE reminder_sends SET status = 'failed', error_message = %s
+                                WHERE google_event_id = %s AND reminder_type = %s
+                            """, (err_msg, c['event_id'], reminder_type))
+                            conn.commit()
+                            failed += 1
+                            logger.error("[Reminders] Send failed for %s: %s",
+                                         c['event_id'], send_err)
+
+                finally:
+                    try:
+                        cur.execute("SELECT pg_advisory_unlock(738291)")
+                        conn.commit()
+                        logger.info("[Reminders] Advisory lock released")
+                    except Exception:
+                        pass
+                    cur.close()
+
+        except Exception as e:
+            logger.error("[Reminders] DB error: %s", e)
+            return
+    else:
+        # No DB — send without dedup (legacy/local-dev fallback)
+        for c in candidates:
+            try:
+                if reminder_type == 'DAY_BEFORE':
+                    send_reminder_day_before(c)
+                    if SMS_SERVICE_AVAILABLE:
+                        send_sms_reminder_day_before(c)
+                else:
+                    send_reminder_morning(c)
+                    if SMS_SERVICE_AVAILABLE:
+                        send_sms_reminder_morning(c)
+                sent += 1
+            except Exception as e:
+                failed += 1
+                logger.error("[Reminders] Send failed (no-DB): %s", e)
+
+    logger.info("[Reminders] Done: sent=%d, skipped_dedup=%d, failed=%d", sent, skipped, failed)
 
 
 # Initialize scheduler
@@ -732,9 +749,7 @@ def book_appointment():
             event = None
             try:
                 event = create_event(booking_data)
-                print(f"Calendar event created: {event.get('id') if event else 'N/A'}")
-                # Invalidate appointments cache for this phone
-                _appointments_cache.pop(normalize_phone(data['phone']), None)
+                logger.info("[Booking] Calendar event created: %s", event.get('id') if event else 'N/A')
             except Exception as cal_error:
                 print(f"Failed to create calendar event: {str(cal_error)}")
 
@@ -812,10 +827,13 @@ def my_appointments():
 
     appointments = get_appointments_by_phone(phone)
 
-    return jsonify({
+    resp = jsonify({
         "appointments": appointments,
         "count": len(appointments)
     })
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 
 @app.route('/api/cancel-appointment', methods=['POST'])
