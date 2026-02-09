@@ -1300,6 +1300,82 @@ def reorder_gallery():
     return jsonify({"success": True})
 
 
+# ============== ADMIN BOOKING ==============
+
+@app.route('/api/admin/create-appointment', methods=['POST'])
+@admin_required
+def admin_create_appointment():
+    """Create an appointment on behalf of a customer (admin only).
+    Creates directly in Google Calendar. No SMS/email/DB."""
+    data = request.json or {}
+
+    name = data.get('name', '').strip()
+    service_name = data.get('service', '').strip()
+    date_str = data.get('date', '').strip()
+    time_str = data.get('time', '').strip()
+
+    if not name or not service_name or not date_str or not time_str:
+        return jsonify({"error": "All fields are required"}), 400
+
+    # Find service details
+    service = None
+    for s in SERVICES:
+        if s['name'] == service_name or s['name_he'] == service_name:
+            service = s
+            break
+    if not service:
+        return jsonify({"error": "Invalid service"}), 400
+
+    # Validate date
+    try:
+        booking_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({"error": "Invalid date format"}), 400
+
+    try:
+        start_dt = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M')
+        end_dt = start_dt + timedelta(minutes=service['duration'])
+
+        cal_service = get_calendar_service()
+        event = {
+            'summary': f"{name} - {service['name_he']}",
+            'description': f"{service['name_he']}\n{name}\n\nBooked via Admin",
+            'start': {
+                'dateTime': start_dt.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+            'end': {
+                'dateTime': end_dt.isoformat(),
+                'timeZone': 'Asia/Jerusalem',
+            },
+        }
+
+        created = cal_service.events().insert(
+            calendarId=CALENDAR_ID,
+            body=event
+        ).execute()
+
+        logger.info("[AdminBooking] Created event %s: %s - %s on %s %s",
+                    created.get('id'), name, service['name_he'], date_str, time_str)
+
+        return jsonify({
+            "success": True,
+            "event_id": created.get('id'),
+            "message": f"התור נקבע בהצלחה ל{name}"
+        })
+
+    except Exception as e:
+        logger.error("[AdminBooking] Failed: %s", e)
+        return jsonify({"error": "שגיאה ביצירת התור. נסי שוב."}), 500
+
+
+@app.route('/api/admin/services', methods=['GET'])
+@admin_required
+def admin_get_services():
+    """Return services list for admin booking form."""
+    return jsonify({"services": SERVICES})
+
+
 @app.route('/api/gallery-images', methods=['GET'])
 def get_public_gallery():
     """Public endpoint to get gallery images for the main site."""

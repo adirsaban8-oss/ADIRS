@@ -485,6 +485,9 @@
             <button class="admin-tab" data-tab="customers" onclick="switchTab('customers')">
                 <i class="fas fa-users"></i> לקוחות
             </button>
+            <button class="admin-tab" data-tab="admin-booking" onclick="switchTab('admin-booking')">
+                <i class="fas fa-calendar-plus"></i> קביעת תורים ללקוח
+            </button>
         </div>
 
         <div class="admin-content">
@@ -602,6 +605,45 @@
                     </div>
 
                     <div id="customersCount" style="margin-top: 16px; text-align: center; color: #8a8a9a; font-size: 0.9rem;"></div>
+                </div>
+            </div>
+
+            <!-- Admin Booking Tab -->
+            <div class="tab-content" id="tab-admin-booking">
+                <div class="date-section">
+                    <h2><i class="fas fa-calendar-plus"></i> קביעת תור ללקוח/ה</h2>
+                    <div id="adminBookingStatus" class="status-msg"></div>
+
+                    <div class="date-picker-row">
+                        <div class="form-group">
+                            <label>שם הלקוח/ה</label>
+                            <input type="text" id="abCustomerName" placeholder="שם מלא..." style="border: 1px solid #2a2a4a; border-radius: 10px; padding: 12px; background: #0f3460; color: #fff; font-family: inherit; width: 100%;">
+                        </div>
+                    </div>
+
+                    <div class="date-picker-row">
+                        <div class="form-group">
+                            <label>סוג שירות</label>
+                            <select id="abService" onchange="adminBookingDateChanged()">
+                                <option value="">-- בחרי שירות --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>תאריך</label>
+                            <input type="date" id="abDate" onchange="adminBookingDateChanged()">
+                        </div>
+                    </div>
+
+                    <div id="abSlotsContainer" style="display:none;">
+                        <label style="display: block; color: #8a8a9a; font-size: 0.85rem; margin-bottom: 8px;">שעות פנויות</label>
+                        <div class="slots-grid" id="abSlotsGrid"></div>
+                    </div>
+
+                    <div class="action-row" style="margin-top: 20px;">
+                        <button class="action-btn primary" id="abSubmitBtn" onclick="submitAdminBooking()" disabled>
+                            <i class="fas fa-check"></i> קבע/י תור
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1106,6 +1148,135 @@
     const blockDateInput = document.getElementById('blockDate');
     const today = new Date().toISOString().split('T')[0];
     blockDateInput.setAttribute('min', today);
+
+    // ============== ADMIN BOOKING ==============
+
+    let abSelectedTime = null;
+
+    // Populate service dropdown on page load
+    (function initAdminBooking() {
+        const select = document.getElementById('abService');
+        const services = [
+            { name: "Gel Polish", name_he: "לק ג'ל", duration: 60 },
+            { name: "Anatomical Structure", name_he: "מבנה אנטומי", duration: 75 },
+            { name: "Gel Fill", name_he: "מילוי ג'ל", duration: 60 },
+            { name: "Single Nail Extension", name_he: "הארכת ציפורן בודדת", duration: 10 },
+            { name: "Building", name_he: "בנייה", duration: 120 },
+            { name: "Eyebrows", name_he: "גבות", duration: 20 },
+            { name: "Mustache", name_he: "שפם", duration: 10 },
+            { name: "Eyebrow Tinting", name_he: "צביעת גבות", duration: 15 }
+        ];
+        services.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.name;
+            opt.textContent = s.name_he + ' (' + s.duration + ' דק\')';
+            select.appendChild(opt);
+        });
+        // Set min date
+        const abDateInput = document.getElementById('abDate');
+        abDateInput.setAttribute('min', today);
+    })();
+
+    async function adminBookingDateChanged() {
+        const service = document.getElementById('abService').value;
+        const date = document.getElementById('abDate').value;
+        const container = document.getElementById('abSlotsContainer');
+        const grid = document.getElementById('abSlotsGrid');
+
+        abSelectedTime = null;
+        document.getElementById('abSubmitBtn').disabled = true;
+
+        if (!service || !date) {
+            container.style.display = 'none';
+            return;
+        }
+
+        grid.innerHTML = '<p style="color: #8a8a9a; grid-column: 1/-1; text-align: center;"><i class="fas fa-spinner fa-spin"></i> טוען שעות...</p>';
+        container.style.display = 'block';
+
+        try {
+            const res = await fetch(`/api/available-slots?date=${date}&service=${encodeURIComponent(service)}`);
+            const data = await res.json();
+            const slots = data.slots || [];
+
+            if (slots.length === 0) {
+                grid.innerHTML = '<p style="color: #ff6b6b; grid-column: 1/-1; text-align: center;">אין שעות פנויות בתאריך זה</p>';
+                return;
+            }
+
+            grid.innerHTML = '';
+            slots.forEach(slot => {
+                const btn = document.createElement('button');
+                btn.className = 'slot-btn';
+                btn.textContent = slot;
+                btn.onclick = function() {
+                    grid.querySelectorAll('.slot-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    abSelectedTime = slot;
+                    document.getElementById('abSubmitBtn').disabled = false;
+                };
+                grid.appendChild(btn);
+            });
+        } catch (e) {
+            grid.innerHTML = '<p style="color: #ff6b6b; grid-column: 1/-1; text-align: center;">שגיאה בטעינת שעות</p>';
+        }
+    }
+
+    async function submitAdminBooking() {
+        const name = document.getElementById('abCustomerName').value.trim();
+        const service = document.getElementById('abService').value;
+        const date = document.getElementById('abDate').value;
+        const statusEl = document.getElementById('adminBookingStatus');
+
+        if (!name) {
+            statusEl.textContent = 'נא להזין שם לקוח/ה';
+            statusEl.className = 'status-msg error';
+            statusEl.style.display = 'block';
+            return;
+        }
+        if (!service || !date || !abSelectedTime) {
+            statusEl.textContent = 'נא למלא את כל השדות';
+            statusEl.className = 'status-msg error';
+            statusEl.style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('abSubmitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> קובע תור...';
+
+        try {
+            const res = await fetch('/api/admin/create-appointment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, service, date, time: abSelectedTime })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                statusEl.textContent = data.message || 'התור נקבע בהצלחה!';
+                statusEl.className = 'status-msg success';
+                statusEl.style.display = 'block';
+                // Reset form
+                document.getElementById('abCustomerName').value = '';
+                document.getElementById('abSlotsContainer').style.display = 'none';
+                abSelectedTime = null;
+                // Refresh slots for same date (slot is now taken)
+                adminBookingDateChanged();
+            } else {
+                statusEl.textContent = data.error || 'שגיאה ביצירת התור';
+                statusEl.className = 'status-msg error';
+                statusEl.style.display = 'block';
+            }
+        } catch (e) {
+            statusEl.textContent = 'שגיאת חיבור';
+            statusEl.className = 'status-msg error';
+            statusEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check"></i> קבע/י תור';
+        }
+    }
     </script>
 </body>
 </html>
