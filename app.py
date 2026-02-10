@@ -304,13 +304,22 @@ def check_and_send_reminders():
     """
     now = datetime.now(ISRAEL_TZ)
 
-    # Only run at reminder hours: 20:00 (day-before) or 08:00 (morning-of)
-    if now.hour not in (8, 20):
+    # Log every scheduler tick so we can verify it's running in Railway logs
+    print(f"[Reminders] Scheduler tick: Israel time={now.strftime('%Y-%m-%d %H:%M:%S')}", flush=True)
+
+    # Anti-burst: only send within tight windows around scheduled hours
+    # Day-before window: 19:55–20:10  |  Same-day window: 07:55–08:10
+    hour, minute = now.hour, now.minute
+    in_day_before_window = (hour == 19 and minute >= 55) or (hour == 20 and minute <= 10)
+    in_same_day_window = (hour == 7 and minute >= 55) or (hour == 8 and minute <= 10)
+
+    if not (in_day_before_window or in_same_day_window):
         return
 
-    reminder_type = 'DAY_BEFORE' if now.hour == 20 else 'DAY_OF'
-    target_date = (now + timedelta(days=1)).date() if now.hour == 20 else now.date()
+    reminder_type = 'DAY_BEFORE' if in_day_before_window else 'DAY_OF'
+    target_date = (now + timedelta(days=1)).date() if reminder_type == 'DAY_BEFORE' else now.date()
 
+    print(f"[Reminders] === RUNNING === type={reminder_type}, target_date={target_date}, DB_ENABLED={DB_ENABLED}, SMS_AVAILABLE={SMS_SERVICE_AVAILABLE}", flush=True)
     logger.info("[Reminders] Scheduler triggered: hour=%d, type=%s, target=%s",
                 now.hour, reminder_type, target_date)
 
@@ -366,13 +375,21 @@ def check_and_send_reminders():
             'service_he': lines[0],
             'date': event_start.strftime('%Y-%m-%d'),
             'time': event_start.strftime('%H:%M'),
+            'extended_props': event.get('extendedProperties', {}).get('private', {}),
         })
 
     if not candidates:
-        logger.info("[Reminders] No valid events to process")
+        print(f"[Reminders] No valid candidates from {len(events)} events (all had < 3 description lines or no phone)", flush=True)
         return
 
-    # ---- Step 3 + 4: Dedup via DB + send with status tracking ----
+    print(f"[Reminders] {len(candidates)} candidates ready for delivery", flush=True)
+    for i, c in enumerate(candidates):
+        print(f"[Reminders]   #{i+1}: {c['name']} | phone={c['phone']} | {c['date']} {c['time']}", flush=True)
+
+    # Calendar-level dedup flag key
+    flag_key = 'reminder_day_before_sent' if reminder_type == 'DAY_BEFORE' else 'reminder_same_day_sent'
+
+    # ---- Step 3 + 4: Dedup via Calendar flags + DB + send ----
     sent = 0
     skipped = 0
     failed = 0
@@ -394,7 +411,14 @@ def check_and_send_reminders():
 
                 try:
                     for c in candidates:
-                        # Step 3a: INSERT with status='pending', skip on UNIQUE conflict
+                        # ---- LAYER 1: Calendar extendedProperties flag ----
+                        if c['extended_props'].get(flag_key) == '1':
+                            print(f"[Reminders] SKIP (Calendar flag) {c['name']} — {flag_key} already set", flush=True)
+                            skipped += 1
+                            continue
+
+                        # ---- LAYER 2: DB dedup ----
+                        # INSERT with status='pending', skip on UNIQUE conflict
                         cur.execute("""
                             INSERT INTO reminder_sends (google_event_id, reminder_type, status)
                             VALUES (%s, %s, 'pending')
@@ -421,18 +445,35 @@ def check_and_send_reminders():
                                 skipped += 1
                                 continue
 
-                        # Step 3b: Attempt to send
+                        # ---- SEND: email and SMS in SEPARATE try blocks ----
+                        any_sent = False
+                        last_err = None
+
+                        # Email (non-blocking — failure must NOT prevent SMS)
                         try:
                             if reminder_type == 'DAY_BEFORE':
                                 send_reminder_day_before(c)
-                                if SMS_SERVICE_AVAILABLE:
-                                    send_sms_reminder_day_before(c)
                             else:
                                 send_reminder_morning(c)
-                                if SMS_SERVICE_AVAILABLE:
-                                    send_sms_reminder_morning(c)
+                        except Exception as email_err:
+                            print(f"[Reminders] Email failed for {c['event_id']}: {email_err}", flush=True)
 
-                            # Step 3c: Mark as sent
+                        # SMS (independent of email)
+                        if SMS_SERVICE_AVAILABLE:
+                            try:
+                                if reminder_type == 'DAY_BEFORE':
+                                    sms_ok = send_sms_reminder_day_before(c)
+                                else:
+                                    sms_ok = send_sms_reminder_morning(c)
+                                if sms_ok:
+                                    any_sent = True
+                                print(f"[Reminders] SMS {reminder_type} to {c['phone']}: {'OK' if sms_ok else 'FAIL (returned False)'}", flush=True)
+                            except Exception as sms_err:
+                                last_err = sms_err
+                                print(f"[Reminders] SMS exception for {c['event_id']}: {sms_err}", flush=True)
+
+                        if any_sent or last_err is None:
+                            # Mark as sent in DB
                             cur.execute("""
                                 UPDATE reminder_sends SET status = 'sent'
                                 WHERE google_event_id = %s AND reminder_type = %s
@@ -442,9 +483,22 @@ def check_and_send_reminders():
                             logger.info("[Reminders] Sent %s to %s (%s)",
                                         reminder_type, c['name'], c['phone'])
 
-                        except Exception as send_err:
-                            # Step 3d: Mark as failed with error message
-                            err_msg = str(send_err)[:500]
+                            # ---- LAYER 1 WRITE: Calendar flag ONLY after confirmed SMS delivery ----
+                            if any_sent:
+                                try:
+                                    merged_props = c['extended_props'].copy()
+                                    merged_props[flag_key] = '1'
+                                    service.events().patch(
+                                        calendarId=CALENDAR_ID,
+                                        eventId=c['event_id'],
+                                        body={'extendedProperties': {'private': merged_props}}
+                                    ).execute()
+                                    print(f"[Reminders] Calendar flag SET: {c['event_id']}/{flag_key}", flush=True)
+                                except Exception as flag_err:
+                                    print(f"[Reminders] WARNING: Calendar flag write failed for {c['event_id']}: {flag_err}", flush=True)
+                        else:
+                            # Mark as failed with error message
+                            err_msg = str(last_err)[:500]
                             cur.execute("""
                                 UPDATE reminder_sends SET status = 'failed', error_message = %s
                                 WHERE google_event_id = %s AND reminder_type = %s
@@ -452,7 +506,7 @@ def check_and_send_reminders():
                             conn.commit()
                             failed += 1
                             logger.error("[Reminders] Send failed for %s: %s",
-                                         c['event_id'], send_err)
+                                         c['event_id'], last_err)
 
                 finally:
                     try:
@@ -467,29 +521,61 @@ def check_and_send_reminders():
             logger.error("[Reminders] DB error: %s", e)
             return
     else:
-        # No DB — send without dedup (legacy/local-dev fallback)
+        # No DB — Calendar flags are the ONLY dedup layer
         for c in candidates:
+            # Calendar flag check
+            if c['extended_props'].get(flag_key) == '1':
+                print(f"[Reminders] SKIP (Calendar flag, no-DB) {c['name']} — {flag_key} already set", flush=True)
+                skipped += 1
+                continue
+
+            # Email (non-blocking)
             try:
                 if reminder_type == 'DAY_BEFORE':
                     send_reminder_day_before(c)
-                    if SMS_SERVICE_AVAILABLE:
-                        send_sms_reminder_day_before(c)
                 else:
                     send_reminder_morning(c)
-                    if SMS_SERVICE_AVAILABLE:
-                        send_sms_reminder_morning(c)
-                sent += 1
             except Exception as e:
-                failed += 1
-                logger.error("[Reminders] Send failed (no-DB): %s", e)
+                print(f"[Reminders] Email failed (no-DB): {e}", flush=True)
 
+            # SMS (independent of email)
+            sms_ok = False
+            if SMS_SERVICE_AVAILABLE:
+                try:
+                    if reminder_type == 'DAY_BEFORE':
+                        sms_ok = send_sms_reminder_day_before(c)
+                    else:
+                        sms_ok = send_sms_reminder_morning(c)
+                    sent += 1
+                except Exception as e:
+                    failed += 1
+                    print(f"[Reminders] SMS failed (no-DB): {e}", flush=True)
+            else:
+                sent += 1
+
+            # Set Calendar flag ONLY after confirmed SMS delivery
+            if sms_ok:
+                try:
+                    merged_props = c['extended_props'].copy()
+                    merged_props[flag_key] = '1'
+                    service.events().patch(
+                        calendarId=CALENDAR_ID,
+                        eventId=c['event_id'],
+                        body={'extendedProperties': {'private': merged_props}}
+                    ).execute()
+                    print(f"[Reminders] Calendar flag SET (no-DB): {c['event_id']}/{flag_key}", flush=True)
+                except Exception as flag_err:
+                    print(f"[Reminders] WARNING: Calendar flag write failed (no-DB) {c['event_id']}: {flag_err}", flush=True)
+
+    print(f"[Reminders] === DONE === sent={sent}, skipped_dedup={skipped}, failed={failed}", flush=True)
     logger.info("[Reminders] Done: sent=%d, skipped_dedup=%d, failed=%d", sent, skipped, failed)
 
 
 # Initialize scheduler
 scheduler = BackgroundScheduler()
-# Check for reminders every hour
-scheduler.add_job(func=check_and_send_reminders, trigger="cron", minute=0)
+# Check for reminders every hour; misfire_grace_time=600 allows jobs delayed by up to
+# 10 min (e.g. Railway wake-up) — our time-window check filters late bursts beyond that
+scheduler.add_job(func=check_and_send_reminders, trigger="cron", minute=0, misfire_grace_time=600)
 scheduler.start()
 
 # Shut down the scheduler when exiting the app
@@ -642,6 +728,11 @@ def book_appointment():
         for field in required_fields:
             if not data.get(field):
                 return jsonify({"error": f"Missing required field: {field}"}), 400
+
+        # Normalize phone for Calendar/SMS/DB consistency (same as admin booking)
+        normalized = normalize_israeli_phone(data['phone'])
+        if normalized:
+            data['phone'] = normalized
 
         # Max 30 days validation
         try:
@@ -1306,16 +1397,22 @@ def reorder_gallery():
 @admin_required
 def admin_create_appointment():
     """Create an appointment on behalf of a customer (admin only).
-    Creates directly in Google Calendar. No SMS/email/DB."""
+    Behaves EXACTLY like regular booking: Calendar event + SMS confirmation + reminder pipeline."""
     data = request.json or {}
 
     name = data.get('name', '').strip()
+    phone_raw = data.get('phone', '').strip()
     service_name = data.get('service', '').strip()
     date_str = data.get('date', '').strip()
     time_str = data.get('time', '').strip()
 
-    if not name or not service_name or not date_str or not time_str:
-        return jsonify({"error": "All fields are required"}), 400
+    if not name or not phone_raw or not service_name or not date_str or not time_str:
+        return jsonify({"error": "כל השדות חובה (שם, טלפון, שירות, תאריך, שעה)"}), 400
+
+    # Normalize phone
+    phone = normalize_israeli_phone(phone_raw)
+    if not phone:
+        return jsonify({"error": "מספר טלפון לא תקין"}), 400
 
     # Find service details
     service = None
@@ -1333,30 +1430,40 @@ def admin_create_appointment():
         return jsonify({"error": "Invalid date format"}), 400
 
     try:
-        start_dt = datetime.strptime(f"{date_str} {time_str}", '%Y-%m-%d %H:%M')
-        end_dt = start_dt + timedelta(minutes=service['duration'])
-
-        cal_service = get_calendar_service()
-        event = {
-            'summary': f"{name} - {service['name_he']}",
-            'description': f"{service['name_he']}\n{name}\n\nBooked via Admin",
-            'start': {
-                'dateTime': start_dt.isoformat(),
-                'timeZone': 'Asia/Jerusalem',
-            },
-            'end': {
-                'dateTime': end_dt.isoformat(),
-                'timeZone': 'Asia/Jerusalem',
-            },
+        # Build booking_data identical to regular booking flow
+        booking_data = {
+            "name": name,
+            "phone": phone,
+            "email": "",
+            "service": service['name'],
+            "service_he": service['name_he'],
+            "date": date_str,
+            "time": time_str,
+            "duration": service['duration'],
+            "notes": "",
         }
 
-        created = cal_service.events().insert(
-            calendarId=CALENDAR_ID,
-            body=event
-        ).execute()
+        # Create Calendar event using the SAME create_event() as regular bookings
+        # This ensures description format is: service_he\n\nname\nphone\nemail
+        # which the reminder parser expects (lines[0]=service, lines[1]=name, lines[2]=phone)
+        created = create_event(booking_data)
 
-        logger.info("[AdminBooking] Created event %s: %s - %s on %s %s",
-                    created.get('id'), name, service['name_he'], date_str, time_str)
+        logger.info("[AdminBooking] Created event %s: %s - %s on %s %s (phone: %s)",
+                    created.get('id'), name, service['name_he'], date_str, time_str, phone)
+
+        # Send SMS confirmation (same as regular booking)
+        sms_enabled = os.getenv("SMS_ENABLED", "false").lower() == "true"
+        if sms_enabled and SMS_SERVICE_AVAILABLE:
+            try:
+                print(f"[AdminBooking][SMS] Sending confirmation to {name} ({phone})...", flush=True)
+                sms_thread = threading.Thread(
+                    target=send_sms_booking_confirmation,
+                    args=(booking_data,),
+                    daemon=True
+                )
+                sms_thread.start()
+            except Exception as sms_err:
+                logger.error("[AdminBooking][SMS] Failed: %s", sms_err)
 
         return jsonify({
             "success": True,

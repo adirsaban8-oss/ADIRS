@@ -623,6 +623,13 @@
 
                     <div class="date-picker-row">
                         <div class="form-group">
+                            <label>טלפון הלקוח/ה</label>
+                            <input type="tel" id="abCustomerPhone" placeholder="050-1234567" dir="ltr" style="border: 1px solid #2a2a4a; border-radius: 10px; padding: 12px; background: #0f3460; color: #fff; font-family: inherit; width: 100%; text-align: left;">
+                        </div>
+                    </div>
+
+                    <div class="date-picker-row">
+                        <div class="form-group">
                             <label>סוג שירות</label>
                             <select id="abService" onchange="adminBookingDateChanged()">
                                 <option value="">-- בחרי שירות --</option>
@@ -1224,12 +1231,19 @@
 
     async function submitAdminBooking() {
         const name = document.getElementById('abCustomerName').value.trim();
+        const phone = document.getElementById('abCustomerPhone').value.trim();
         const service = document.getElementById('abService').value;
         const date = document.getElementById('abDate').value;
         const statusEl = document.getElementById('adminBookingStatus');
 
         if (!name) {
             statusEl.textContent = 'נא להזין שם לקוח/ה';
+            statusEl.className = 'status-msg error';
+            statusEl.style.display = 'block';
+            return;
+        }
+        if (!phone) {
+            statusEl.textContent = 'נא להזין טלפון לקוח/ה';
             statusEl.className = 'status-msg error';
             statusEl.style.display = 'block';
             return;
@@ -1249,7 +1263,7 @@
             const res = await fetch('/api/admin/create-appointment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, service, date, time: abSelectedTime })
+                body: JSON.stringify({ name, phone, service, date, time: abSelectedTime })
             });
             const data = await res.json();
 
@@ -1259,6 +1273,7 @@
                 statusEl.style.display = 'block';
                 // Reset form
                 document.getElementById('abCustomerName').value = '';
+                document.getElementById('abCustomerPhone').value = '';
                 document.getElementById('abSlotsContainer').style.display = 'none';
                 abSelectedTime = null;
                 // Refresh slots for same date (slot is now taken)
